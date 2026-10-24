@@ -2,5 +2,7 @@
   "name": "NakaSetu — Hyperlocal Labor & Service Gateway",
   "description": "Hyperlocal 30-minute blue-collar service and labor dispatch platform serving smartphone customers and offline feature-phone workers.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
