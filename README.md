@@ -14,7 +14,7 @@
 
 The production application is live and hosted on Vercel:
 👉 **[https://code-vibers-dhruv-surti-naka-setu-ten.vercel.app/](https://code-vibers-dhruv-surti-naka-setu-ten.vercel.app/)**
-
+[![Watch NakaSetu Demo Video](https://img.youtube.com/vi/ph4oA3fFhso/maxresdefault.jpg)](https://youtu.be/ph4oA3fFhso)
 ---
 
 ## 📌 Overview
