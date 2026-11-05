@@ -39,7 +39,10 @@ import {
   HardHat,
   ArrowLeftRight,
   KeyRound,
-  MessageSquareQuote
+  MessageSquareQuote,
+  Receipt,
+  Languages,
+  Calculator
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -49,6 +52,8 @@ import type { LucideIcon } from 'lucide-react';
 
 export type ActiveTab = 'customer' | 'operations';
 
+export type LanguageCode = 'en' | 'hi';
+
 export type ServiceCategory = 'Skilled Trades' | 'Domestic & Naka';
 
 export type RateUnit = 'visit' | 'hr' | 'meal' | 'flat';
@@ -56,10 +61,12 @@ export type RateUnit = 'visit' | 'hr' | 'meal' | 'flat';
 export interface ServiceItem {
   id: string;
   label: string;
+  labelHi: string;
   icon: LucideIcon;
   baseRate: number;
   rateDisplay: string;
   unit: RateUnit;
+  unitLabel: string;
   category: ServiceCategory;
   defaultEtaMins: number;
   description: string;
@@ -109,6 +116,25 @@ export interface WorkerReview {
   comment: string;
 }
 
+export interface BookingRecord {
+  id: string;
+  invoiceNo: string;
+  serviceLabel: string;
+  workerName: string;
+  helperCount: number;
+  durationUnits: number;
+  unitLabel: string;
+  baseRate: number;
+  totalAmount: number;
+  paymentMethod: 'UPI QR' | 'Cash';
+  urgencyLabel: string;
+  landmark: string;
+  completedAt: string;
+  rating: number;
+  startOtp: string;
+  stopOtp: string;
+}
+
 export type CustomerStep = 'booking' | 'matching' | 'assigned' | 'settlement';
 
 export type UrgencyOption = 'immediate' | 'scheduled';
@@ -123,18 +149,26 @@ export interface ToastNotification {
 }
 
 // ============================================================================
-// 2. MOCK DATASET (10-SERVICE CATALOG, WORKERS, SCHEDULE SLOTS & REVIEWS)
+// 2. MOCK DATASET (10-SERVICE CATALOG, WORKERS, SLOTS, REVIEWS, BOOKINGS)
 // ============================================================================
+
+const STORAGE_KEYS = {
+  WORKERS: 'nakasetu_workers_v1',
+  REVIEWS: 'nakasetu_reviews_v1',
+  BOOKINGS: 'nakasetu_bookings_v1'
+} as const;
 
 export const SERVICE_CATALOG: ServiceItem[] = [
   // Skilled Trades (5)
   {
     id: 'srv-electrician',
     label: 'Electrician',
+    labelHi: 'इलेक्ट्रीशियन (बिजली मिस्त्री)',
     icon: Zap,
     baseRate: 199,
     rateDisplay: '₹199',
     unit: 'visit',
+    unitLabel: 'visit / task',
     category: 'Skilled Trades',
     defaultEtaMins: 14,
     description: 'MCB faults, wiring repairs, switchboard & ceiling fan installation'
@@ -142,10 +176,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-plumber',
     label: 'Plumber',
+    labelHi: 'प्लंबर (नल कारीगर)',
     icon: Wrench,
     baseRate: 199,
     rateDisplay: '₹199',
     unit: 'visit',
+    unitLabel: 'visit / task',
     category: 'Skilled Trades',
     defaultEtaMins: 14,
     description: 'Pipe leakages, tap replacement, drainage blockages & tank fitting'
@@ -153,10 +189,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-carpenter',
     label: 'Carpenter',
+    labelHi: 'कारपेंटर (बढ़ई)',
     icon: Hammer,
     baseRate: 249,
     rateDisplay: '₹249',
     unit: 'visit',
+    unitLabel: 'visit / task',
     category: 'Skilled Trades',
     defaultEtaMins: 22,
     description: 'Door lock repair, hinge alignment, modular cabinet & bed assembly'
@@ -164,10 +202,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-painter',
     label: 'Painter',
+    labelHi: 'पेंटर (रंगाई कारीगर)',
     icon: Paintbrush,
     baseRate: 299,
     rateDisplay: '₹299',
     unit: 'visit',
+    unitLabel: 'visit / room',
     category: 'Skilled Trades',
     defaultEtaMins: 25,
     description: 'Wall touch-ups, dampness waterproofing, putty & single-room coats'
@@ -175,10 +215,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-appliance',
     label: 'Appliance Repair',
+    labelHi: 'उपकरण रिपेयर (AC/फ्रिज)',
     icon: Cpu,
     baseRate: 249,
     rateDisplay: '₹249',
     unit: 'visit',
+    unitLabel: 'unit check',
     category: 'Skilled Trades',
     defaultEtaMins: 20,
     description: 'AC servicing, washing machine, refrigerator & geyser diagnostics'
@@ -188,10 +230,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-maid',
     label: 'House Maid',
+    labelHi: 'घरेलू सहायिका (सफाई/बर्तन)',
     icon: Home,
     baseRate: 150,
     rateDisplay: '₹150/hr',
     unit: 'hr',
+    unitLabel: 'hour(s)',
     category: 'Domestic & Naka',
     defaultEtaMins: 15,
     description: 'On-demand sweeping, mopping, utensil washing & kitchen tidy-up'
@@ -199,10 +243,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-cook',
     label: 'Cook',
+    labelHi: 'रसोइया (घर का खाना)',
     icon: Utensils,
     baseRate: 200,
     rateDisplay: '₹200/meal',
     unit: 'meal',
+    unitLabel: 'meal(s)',
     category: 'Domestic & Naka',
     defaultEtaMins: 18,
     description: 'Fresh home-style meal preparation (rotis, sabzi, dal, rice) for up to 4'
@@ -210,10 +256,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-shifting',
     label: 'Luggage/Furniture Shifting',
+    labelHi: 'सामान / फर्नीचर शिफ्टिंग टोली',
     icon: Truck,
     baseRate: 180,
     rateDisplay: '₹180/hr',
     unit: 'hr',
+    unitLabel: 'hour(s)',
     category: 'Domestic & Naka',
     defaultEtaMins: 19,
     description: 'Heavy appliance moving, inter-floor shifting & tempo loading toli'
@@ -221,10 +269,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-cleaning',
     label: 'Compound/Terrace Cleaning',
+    labelHi: 'अहाता / छत सफाई',
     icon: Sparkles,
     baseRate: 250,
     rateDisplay: '₹250 flat',
     unit: 'flat',
+    unitLabel: 'zone(s)',
     category: 'Domestic & Naka',
     defaultEtaMins: 21,
     description: 'Debris clearance, pressure washing, leaf sweeping & drain desilting'
@@ -232,10 +282,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   {
     id: 'srv-loader',
     label: 'General Loader/Helper',
+    labelHi: 'नाका हेल्पर / मजदूर',
     icon: Package,
     baseRate: 150,
     rateDisplay: '₹150/hr',
     unit: 'hr',
+    unitLabel: 'hour(s)',
     category: 'Domestic & Naka',
     defaultEtaMins: 12,
     description: 'Daily-wage Naka helper for construction material, shop stock & lifting'
@@ -378,6 +430,27 @@ export const INITIAL_WORKER_REVIEWS: WorkerReview[] = [
   }
 ];
 
+export const INITIAL_BOOKING_HISTORY: BookingRecord[] = [
+  {
+    id: 'BKG-7902',
+    invoiceNo: 'INV-8810',
+    serviceLabel: 'Electrician',
+    workerName: 'Rajeshwar Vishwakarma',
+    helperCount: 1,
+    durationUnits: 1,
+    unitLabel: 'visit / task',
+    baseRate: 199,
+    totalAmount: 199,
+    paymentMethod: 'UPI QR',
+    urgencyLabel: 'Under 30 Mins',
+    landmark: 'Flat B-402, Shanti Niketan, Near Chakala Metro Gate 2',
+    completedAt: '2 days ago · 6:40 PM',
+    rating: 5,
+    startOtp: '4821',
+    stopOtp: '9306'
+  }
+];
+
 const NAKA_HUB_OPTIONS = [
   'Station Road Chowk',
   'Bharti Park Naka',
@@ -388,15 +461,114 @@ const NAKA_HUB_OPTIONS = [
 
 const FEEDBACK_TAGS = ['Punctual', 'Clean Work', 'Polite'] as const;
 
+// Bilingual Dictionary (Pure Frontend)
+const UI_COPY = {
+  en: {
+    subtitle: 'Hyperlocal Labor & Service Gateway',
+    customerTab: 'Customer App View',
+    opsTab: 'Field Operations & Call Desk',
+    registerPartner: 'Register as a Partner / Worker',
+    pastBookings: 'Past Bookings',
+    catalogHeading: 'All 10 Hyperlocal Service Tiers',
+    catalogSub: 'Fixed base rates · Instant dispatch to smartphone partners & Naka toli leads',
+    dispatchConfig: 'DISPATCH CONFIGURATION',
+    urgencyLabel: 'Urgency Selector',
+    under30Mins: 'Under 30 Mins',
+    scheduled: 'Scheduled',
+    calculatorTitle: 'Helper Count & Duration Price Calculator',
+    helpersLabel: 'Workers / Toli Size',
+    durationLabel: 'Duration / Units',
+    estimatedTotal: 'Estimated Total',
+    broadcastBtn: 'Broadcast Request (3 km)',
+    opsFormTitle: 'Helpline & Naka Registration Desk (For Feature-Phone Workers)',
+    directoryTitle: 'Live Worker Directory'
+  },
+  hi: {
+    subtitle: 'हाइपरलोकल नाका श्रमिक और सेवा गेटवे',
+    customerTab: 'ग्राहक बुकिंग ऐप',
+    opsTab: 'फील्ड ऑपरेशंस और कॉल डेस्क',
+    registerPartner: 'पार्टनर / कारीगर पंजीकरण',
+    pastBookings: 'पुरानी बुकिंग व रसीद',
+    catalogHeading: 'सभी 10 हाइपरलोकल सेवाएं',
+    catalogSub: 'तय दरें · 30 मिनट में नजदीकी नाका कारीगर या टोली आपके द्वार',
+    dispatchConfig: 'बुकिंग विवरण व शुल्क',
+    urgencyLabel: 'समय का चयन करें',
+    under30Mins: 'तुरंत (30 मिनट में)',
+    scheduled: 'बाद के लिए शेड्यूल करें',
+    calculatorTitle: 'मजदूर संख्या और समय शुल्क कैलकुलेटर',
+    helpersLabel: 'कारीगर / हेल्पर संख्या',
+    durationLabel: 'समय / यूनिट',
+    estimatedTotal: 'अनुमानित कुल राशि',
+    broadcastBtn: 'रिक्वेस्ट भेजें (3 किमी रेडार)',
+    opsFormTitle: 'हेल्पलाइन और नाका पंजीकरण डेस्क (फीचर-फोन श्रमिकों के लिए)',
+    directoryTitle: 'लाइव नाका वर्कर डायरेक्टरी'
+  }
+} as const;
+
 // ============================================================================
-// 3. MAIN COMPONENT & DEEP BLUE + TERTIARY ORANGE SHELL
+// 3. MAIN COMPONENT
 // ============================================================================
 
 export default function NakaSetuApp() {
-  // Global Navigation & Directory State
+  // Global Navigation & Language State
   const [activeTab, setActiveTab] = useState<ActiveTab>('customer');
-  const [workers, setWorkers] = useState<Worker[]>(INITIAL_WORKERS);
+  const [lang, setLang] = useState<LanguageCode>('en');
+  const t = UI_COPY[lang];
+
+  // Persistent State initialized from localStorage
+  const [workers, setWorkers] = useState<Worker[]>(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEYS.WORKERS);
+      return saved ? (JSON.parse(saved) as Worker[]) : INITIAL_WORKERS;
+    } catch {
+      return INITIAL_WORKERS;
+    }
+  });
+
+  const [workerReviews, setWorkerReviews] = useState<WorkerReview[]>(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEYS.REVIEWS);
+      return saved ? (JSON.parse(saved) as WorkerReview[]) : INITIAL_WORKER_REVIEWS;
+    } catch {
+      return INITIAL_WORKER_REVIEWS;
+    }
+  });
+
+  const [bookingHistory, setBookingHistory] = useState<BookingRecord[]>(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEYS.BOOKINGS);
+      return saved ? (JSON.parse(saved) as BookingRecord[]) : INITIAL_BOOKING_HISTORY;
+    } catch {
+      return INITIAL_BOOKING_HISTORY;
+    }
+  });
+
   const [toast, setToast] = useState<ToastNotification | null>(null);
+
+  // Sync to localStorage
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.WORKERS, JSON.stringify(workers));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [workers]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(workerReviews));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [workerReviews]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookingHistory));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [bookingHistory]);
 
   // --------------------------------------------------------------------------
   // VIEW 1 (Customer App View & Verified Trust Flow) State
@@ -406,6 +578,8 @@ export default function NakaSetuApp() {
     ServiceCategory | 'All'
   >('All');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('srv-plumber');
+  const [helperCount, setHelperCount] = useState<number>(1);
+  const [durationUnits, setDurationUnits] = useState<number>(1);
   const [urgency, setUrgency] = useState<UrgencyOption>('immediate');
   const [scheduledSlot, setScheduledSlot] = useState<string>(
     'Today, 4:00 PM – 5:00 PM'
@@ -419,11 +593,10 @@ export default function NakaSetuApp() {
   const [isMaskedCallModalOpen, setIsMaskedCallModalOpen] = useState<boolean>(false);
   const [isSosModalOpen, setIsSosModalOpen] = useState<boolean>(false);
   const [isUpiQrModalOpen, setIsUpiQrModalOpen] = useState<boolean>(false);
+  const [isBookingsModalOpen, setIsBookingsModalOpen] = useState<boolean>(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<BookingRecord | null>(null);
 
-  // View 1 Reviews & Settlement State
-  const [workerReviews, setWorkerReviews] = useState<WorkerReview[]>(
-    INITIAL_WORKER_REVIEWS
-  );
+  // View 1 Settlement & Two-Way Rating State
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
   const [customerRating, setCustomerRating] = useState<number>(5);
   const [selectedFeedbackTags, setSelectedFeedbackTags] = useState<string[]>([
@@ -459,6 +632,7 @@ export default function NakaSetuApp() {
 
   const [opsSearchQuery, setOpsSearchQuery] = useState<string>('');
   const [opsPhoneFilter, setOpsPhoneFilter] = useState<'All' | PhoneType>('All');
+  const [opsHubFilter, setOpsHubFilter] = useState<string>('All Hubs');
   const [ivrTargetWorker, setIvrTargetWorker] = useState<Worker | null>(null);
 
   // --------------------------------------------------------------------------
@@ -486,12 +660,17 @@ export default function NakaSetuApp() {
   }, [toast]);
 
   // --------------------------------------------------------------------------
-  // Derived State
+  // Derived State & Live Price Calculator
   // --------------------------------------------------------------------------
   const selectedService = useMemo(
     () =>
       SERVICE_CATALOG.find((s) => s.id === selectedServiceId) || SERVICE_CATALOG[0],
     [selectedServiceId]
+  );
+
+  const estimatedTotal = useMemo(
+    () => selectedService.baseRate * helperCount * durationUnits,
+    [selectedService.baseRate, helperCount, durationUnits]
   );
 
   const displayedCatalog = useMemo(() => {
@@ -506,9 +685,11 @@ export default function NakaSetuApp() {
         w.skill.toLowerCase().includes(opsSearchQuery.toLowerCase()) ||
         w.hubLocation.toLowerCase().includes(opsSearchQuery.toLowerCase());
       const matchesPhone = opsPhoneFilter === 'All' || w.phoneType === opsPhoneFilter;
-      return matchesSearch && matchesPhone;
+      const matchesHub =
+        opsHubFilter === 'All Hubs' || w.hubLocation === opsHubFilter;
+      return matchesSearch && matchesPhone && matchesHub;
     });
-  }, [workers, opsSearchQuery, opsPhoneFilter]);
+  }, [workers, opsSearchQuery, opsPhoneFilter, opsHubFilter]);
 
   // --------------------------------------------------------------------------
   // 3-Second Live Radar Matching Timer Effect
@@ -564,6 +745,26 @@ export default function NakaSetuApp() {
       setWorkerReviews((prev) => [newReview, ...prev]);
     }
 
+    const newBooking: BookingRecord = {
+      id: `BKG-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNo: `INV-${Math.floor(8000 + Math.random() * 1999)}`,
+      serviceLabel: selectedService.label,
+      workerName: 'Ramesh Pawar',
+      helperCount,
+      durationUnits,
+      unitLabel: selectedService.unitLabel,
+      baseRate: selectedService.baseRate,
+      totalAmount: estimatedTotal,
+      paymentMethod: paymentMethod === 'upi' ? 'UPI QR' : 'Cash',
+      urgencyLabel: urgency === 'immediate' ? 'Under 30 Mins' : scheduledSlot,
+      landmark: taskNote,
+      completedAt: 'Just now',
+      rating: customerRating,
+      startOtp: '4821',
+      stopOtp: '9306'
+    };
+    setBookingHistory((prev) => [newBooking, ...prev]);
+
     setIsMaskedCallModalOpen(false);
     setIsSosModalOpen(false);
     setIsUpiQrModalOpen(false);
@@ -571,15 +772,15 @@ export default function NakaSetuApp() {
     setUrgency('immediate');
     setPaymentMethod('upi');
     setCustomerRating(5);
+    setHelperCount(1);
+    setDurationUnits(1);
     setSelectedFeedbackTags(['Punctual', 'Clean Work']);
     setWrittenReviewText('');
     setCustomerStep('booking');
     showToast(
       'success',
-      'Two-Way Settlement & Review Saved',
-      `₹${selectedService.baseRate} settled directly with Ramesh Pawar (${customerRating} ★).${
-        trimmedComment ? ' Your written review was added to his public profile.' : ''
-      }`
+      'Receipt Saved & Settlement Completed',
+      `₹${estimatedTotal} settled with Ramesh Pawar (${customerRating} ★). Digital receipt #${newBooking.invoiceNo} added to Past Bookings.`
     );
   };
 
@@ -631,7 +832,7 @@ export default function NakaSetuApp() {
     showToast(
       'success',
       'Smartphone Partner Onboarded',
-      `${newAppWorker.name} (${newAppWorker.skill}) added to Live Directory with badge "App User • Digital KYC Verified".`
+      `${newAppWorker.name} (${newAppWorker.skill}) saved to directory with badge "App User • Digital KYC Verified".`
     );
   };
 
@@ -715,27 +916,42 @@ export default function NakaSetuApp() {
     setIvrTargetWorker(null);
   };
 
+  const handleResetSavedStorage = () => {
+    try {
+      window.localStorage.removeItem(STORAGE_KEYS.WORKERS);
+      window.localStorage.removeItem(STORAGE_KEYS.REVIEWS);
+      window.localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
+    } catch {
+      // Ignore
+    }
+    setWorkers(INITIAL_WORKERS);
+    setWorkerReviews(INITIAL_WORKER_REVIEWS);
+    setBookingHistory(INITIAL_BOOKING_HISTORY);
+    showToast(
+      'info',
+      'Demo Data Reset',
+      'Restored default workers, reviews, and booking records.'
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-[#DBEAFE] text-[#0F172A] flex flex-col relative selection:bg-[#1D4ED8]/20 selection:text-[#0F172A]">
-      {/* Subtle Ambient Mist */}
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col relative selection:bg-[#1D4ED8]/15 selection:text-[#0F172A]">
+      {/* Subtle Top Wash */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 overflow-hidden z-0"
-      >
-        <div className="absolute -top-32 left-1/4 w-96 h-96 bg-[#93C5FD]/40 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 right-12 w-96 h-96 bg-orange-300/25 rounded-full blur-3xl" />
-      </div>
+        className="pointer-events-none fixed inset-x-0 top-0 h-64 bg-gradient-to-b from-blue-50/80 to-transparent z-0"
+      />
 
       {/* =====================================================================
-          GLOBAL HEADER & NAVIGATION (DEEP BLUE + ORANGE TERTIARY)
+          GLOBAL HEADER & NAVIGATION (CRISP WHITE + DEEP BLUE & ORANGE CTAS)
       ===================================================================== */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-lg border-b border-[#93C5FD] shadow-2xs">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3.5 gap-4">
             {/* Brand Identity */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#1E40AF] text-white flex items-center justify-center font-bold text-base tracking-tight shrink-0 shadow-xs">
+                <div className="w-10 h-10 rounded-xl bg-[#1D4ED8] text-white flex items-center justify-center font-bold text-base tracking-tight shrink-0 shadow-xs">
                   NS
                 </div>
                 <div>
@@ -743,13 +959,11 @@ export default function NakaSetuApp() {
                     <h1 className="text-lg font-bold tracking-tight text-[#0F172A] leading-none">
                       NakaSetu
                     </h1>
-                    <span className="text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 px-2.5 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-orange-800 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full">
                       30-Min SLA
                     </span>
                   </div>
-                  <p className="text-xs text-[#475569] mt-1">
-                    Hyperlocal Labor &amp; Service Gateway
-                  </p>
+                  <p className="text-xs text-slate-500 mt-1">{t.subtitle}</p>
                 </div>
               </div>
             </div>
@@ -758,76 +972,105 @@ export default function NakaSetuApp() {
             <div
               role="tablist"
               aria-label="Workspace View Switcher"
-              className="inline-flex items-center p-1 bg-[#BFDBFE] border border-[#93C5FD] rounded-2xl self-start lg:self-auto"
+              className="inline-flex items-center p-1 bg-slate-100 border border-slate-200 rounded-xl self-start lg:self-auto"
             >
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'customer'}
                 onClick={() => setActiveTab('customer')}
-                className={`px-4 py-1.5 text-xs rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-4 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'customer'
-                    ? 'bg-[#1D4ED8] text-white shadow-sm font-semibold'
-                    : 'text-[#1E3A8A] hover:text-[#0F172A] font-medium'
+                    ? 'bg-[#1D4ED8] text-white shadow-xs font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 font-medium'
                 }`}
               >
-                Customer App View
+                {t.customerTab}
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'operations'}
                 onClick={() => setActiveTab('operations')}
-                className={`px-4 py-1.5 text-xs rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-4 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'operations'
-                    ? 'bg-[#1D4ED8] text-white shadow-sm font-semibold'
-                    : 'text-[#1E3A8A] hover:text-[#0F172A] font-medium'
+                    ? 'bg-[#1D4ED8] text-white shadow-xs font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 font-medium'
                 }`}
               >
-                Field Operations &amp; Call Desk
+                {t.opsTab}
               </button>
             </div>
 
-            {/* Right: "Register as a Partner / Worker" Button with Orange Tertiary Accent */}
-            <div className="flex items-center gap-3 self-start lg:self-auto">
+            {/* Right: Language Toggle + Past Bookings + Partner CTA */}
+            <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+              {/* Simple English & Hindi Toggle */}
+              <button
+                type="button"
+                onClick={() => setLang((prev) => (prev === 'en' ? 'hi' : 'en'))}
+                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-200 text-xs font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                title="Switch Language (English / Hindi)"
+              >
+                <Languages className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                <span>{lang === 'en' ? 'EN · हिंदी' : 'हिंदी · EN'}</span>
+              </button>
+
+              {/* Past Bookings & Receipt Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedReceipt(bookingHistory[0] || null);
+                  setIsBookingsModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-2xs text-xs font-semibold transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer tabular-nums"
+              >
+                <Receipt className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                <span>
+                  {t.pastBookings} ({bookingHistory.length})
+                </span>
+              </button>
+
+              {/* Register as a Partner / Worker Button (Warm Orange Tertiary Accent) */}
               <button
                 type="button"
                 onClick={() => setIsPartnerModalOpen(true)}
-                className="px-4 py-2 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white border border-orange-700 shadow-sm text-xs font-semibold transition-all inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs text-xs font-semibold transition-all inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <HardHat className="w-4 h-4 text-orange-100" />
-                <span>Register as a Partner / Worker</span>
+                <span>{t.registerPartner}</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Operational Metrics & Customer Verification Strip */}
-        <div className="bg-[#BFDBFE]/80 border-t border-[#93C5FD]">
+        <div className="bg-slate-50 border-t border-slate-200/80">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-4 text-xs">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[#1E3A8A] font-medium tabular-nums">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-slate-600 font-medium tabular-nums">
               <span className="inline-flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                <strong className="font-semibold text-[#0F172A]">28 Active Nearby</strong>
+                <strong className="font-semibold text-slate-900">
+                  {workers.filter((w) => w.status === 'Available').length} Available / 28 Nearby
+                </strong>
               </span>
-              <span className="text-blue-400" aria-hidden="true">
+              <span className="text-slate-300" aria-hidden="true">
                 ·
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                <strong className="font-semibold text-[#0F172A]">4 Naka Hubs Online</strong>
+                <strong className="font-semibold text-slate-900">5 Naka Hubs Online</strong>
               </span>
-              <span className="text-blue-400" aria-hidden="true">
+              <span className="text-slate-300" aria-hidden="true">
                 ·
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-orange-600" />
-                <strong className="font-semibold text-[#0F172A]">Avg Arrival: 18m</strong>
+                <strong className="font-semibold text-slate-900">Avg Arrival: 18m</strong>
               </span>
             </div>
 
-            {/* Customer Verified Strip (Preserved Semantic Green for Verification) */}
-            <div className="flex items-center gap-2 text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-0.5 rounded-full font-mono text-[11px] tabular-nums">
+            {/* Customer Verified Strip */}
+            <div className="flex items-center gap-2 text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-0.5 rounded-full font-mono text-[11px] tabular-nums">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>
                 Customer Verified: Phone OTP (+91 98201 •••••) • Geo-Locked • Zero Advance Fee
@@ -844,12 +1087,12 @@ export default function NakaSetuApp() {
         <div className="relative z-20 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"
-            className={`px-4 py-3 rounded-2xl backdrop-blur-md border flex items-center justify-between gap-3 text-xs shadow-sm ${
+            className={`px-4 py-3 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-xs ${
               toast.type === 'success'
-                ? 'bg-emerald-50/95 border-emerald-300 text-emerald-900'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                 : toast.type === 'warning'
-                  ? 'bg-amber-50/95 border-amber-300 text-amber-900'
-                  : 'bg-white border-[#93C5FD] text-[#0F172A]'
+                  ? 'bg-amber-50 border-amber-200 text-amber-900'
+                  : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -863,14 +1106,14 @@ export default function NakaSetuApp() {
                 }`}
               />
               <div>
-                <span className="font-bold text-[#0F172A]">{toast.title}: </span>
+                <span className="font-bold text-slate-900">{toast.title}: </span>
                 <span>{toast.message}</span>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setToast(null)}
-              className="p-1 text-[#475569] hover:text-[#0F172A] rounded-lg cursor-pointer"
+              className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
               aria-label="Dismiss notification"
             >
               <X className="w-3.5 h-3.5" />
@@ -888,7 +1131,7 @@ export default function NakaSetuApp() {
             {/* VIEW 1 INJECTED HERE */}
             <div className="space-y-6">
               {/* Step Progress Bar */}
-              <div className="bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
+              <div className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2 sm:gap-4 text-xs font-medium overflow-x-auto">
                   {(
                     [
@@ -904,17 +1147,17 @@ export default function NakaSetuApp() {
                     return (
                       <React.Fragment key={s.key}>
                         {idx > 0 && (
-                          <span className="text-blue-300 select-none" aria-hidden="true">
+                          <span className="text-slate-300 select-none" aria-hidden="true">
                             /
                           </span>
                         )}
                         <div
                           className={`inline-flex items-center gap-2 whitespace-nowrap ${
                             isCurrent
-                              ? 'text-[#0F172A] font-bold'
+                              ? 'text-slate-900 font-bold'
                               : isPassed
                                 ? 'text-emerald-700 font-semibold'
-                                : 'text-[#475569]'
+                                : 'text-slate-500'
                           }`}
                         >
                           <span
@@ -922,8 +1165,8 @@ export default function NakaSetuApp() {
                               isCurrent
                                 ? 'bg-[#1D4ED8] text-white font-bold'
                                 : isPassed
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-[#DBEAFE] text-[#1E3A8A] border border-[#93C5FD]'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}
                           >
                             {s.stepNum}
@@ -938,11 +1181,11 @@ export default function NakaSetuApp() {
                 {customerStep !== 'booking' && (
                   <button
                     type="button"
-                    onClick={handleFinishAndReset}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1E3A8A] hover:text-[#0F172A] transition-colors cursor-pointer whitespace-nowrap"
+                    onClick={() => setCustomerStep('booking')}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-orange-600" />
-                    <span>Reset Flow</span>
+                    <span>Back to Step 1</span>
                   </button>
                 )}
               </div>
@@ -952,15 +1195,15 @@ export default function NakaSetuApp() {
               ============================================================= */}
               {customerStep === 'booking' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  {/* Left 7 Columns: 10 Service Tiers in White Cards */}
-                  <div className="lg:col-span-7 bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-5 space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#BFDBFE]">
+                  {/* Left 7 Columns: 10 Service Tiers in Crisp White Cards */}
+                  <div className="lg:col-span-7 bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-5 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
                       <div>
-                        <h2 className="text-base font-semibold text-[#0F172A]">
-                          All 10 Hyperlocal Service Tiers
+                        <h2 className="text-base font-semibold text-slate-900">
+                          {t.catalogHeading}
                         </h2>
-                        <p className="text-xs text-[#475569] mt-0.5">
-                          Fixed base rates · Instant dispatch to smartphone partners &amp; Naka toli leads
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {t.catalogSub}
                         </p>
                       </div>
 
@@ -968,7 +1211,7 @@ export default function NakaSetuApp() {
                       <div
                         role="tablist"
                         aria-label="Service Category Filter"
-                        className="inline-flex items-center p-1 bg-[#DBEAFE] border border-[#93C5FD] rounded-xl self-start"
+                        className="inline-flex items-center p-1 bg-slate-100 border border-slate-200 rounded-xl self-start"
                       >
                         <button
                           type="button"
@@ -977,8 +1220,8 @@ export default function NakaSetuApp() {
                           onClick={() => handleSelectCategoryTab('All')}
                           className={`px-3 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                             selectedCategoryTab === 'All'
-                              ? 'bg-[#1D4ED8] text-white shadow-sm font-semibold'
-                              : 'text-[#1E3A8A] hover:text-[#0F172A] font-medium'
+                              ? 'bg-[#1D4ED8] text-white shadow-2xs font-semibold'
+                              : 'text-slate-600 hover:text-slate-900 font-medium'
                           }`}
                         >
                           All (10)
@@ -990,8 +1233,8 @@ export default function NakaSetuApp() {
                           onClick={() => handleSelectCategoryTab('Skilled Trades')}
                           className={`px-3 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                             selectedCategoryTab === 'Skilled Trades'
-                              ? 'bg-[#1D4ED8] text-white shadow-sm font-semibold'
-                              : 'text-[#1E3A8A] hover:text-[#0F172A] font-medium'
+                              ? 'bg-[#1D4ED8] text-white shadow-2xs font-semibold'
+                              : 'text-slate-600 hover:text-slate-900 font-medium'
                           }`}
                         >
                           Skilled Trades
@@ -1003,8 +1246,8 @@ export default function NakaSetuApp() {
                           onClick={() => handleSelectCategoryTab('Domestic & Naka')}
                           className={`px-3 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                             selectedCategoryTab === 'Domestic & Naka'
-                              ? 'bg-[#1D4ED8] text-white shadow-sm font-semibold'
-                              : 'text-[#1E3A8A] hover:text-[#0F172A] font-medium'
+                              ? 'bg-[#1D4ED8] text-white shadow-2xs font-semibold'
+                              : 'text-slate-600 hover:text-slate-900 font-medium'
                           }`}
                         >
                           Domestic &amp; Naka
@@ -1022,30 +1265,30 @@ export default function NakaSetuApp() {
                             key={service.id}
                             type="button"
                             onClick={() => setSelectedServiceId(service.id)}
-                            className={`text-left p-4 rounded-2xl transition-all flex items-start justify-between gap-3 cursor-pointer ${
+                            className={`text-left p-4 rounded-xl transition-all flex items-start justify-between gap-3 cursor-pointer ${
                               isSelected
-                                ? 'bg-[#BFDBFE]/65 border-2 border-[#1D4ED8] shadow-md shadow-[#1D4ED8]/15'
-                                : 'bg-white border border-[#93C5FD] hover:border-[#1D4ED8] hover:bg-[#DBEAFE]/40 shadow-2xs'
+                                ? 'bg-blue-50/60 border-2 border-[#1D4ED8] shadow-xs'
+                                : 'bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                             }`}
                           >
                             <div className="flex items-start gap-3 min-w-0">
                               <div
                                 className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
                                   isSelected
-                                    ? 'bg-[#1D4ED8] text-white border-[#1E40AF] shadow-xs'
-                                    : 'bg-[#DBEAFE] text-[#1D4ED8] border-[#93C5FD]'
+                                    ? 'bg-[#1D4ED8] text-white border-[#1D4ED8]'
+                                    : 'bg-slate-100 text-[#1D4ED8] border-slate-200/80'
                                 }`}
                               >
                                 <IconComponent className="w-4 h-4" />
                               </div>
                               <div className="min-w-0">
-                                <div className="font-semibold text-sm text-[#0F172A] truncate">
-                                  {service.label}
+                                <div className="font-semibold text-sm text-slate-900 truncate">
+                                  {lang === 'hi' ? service.labelHi : service.label}
                                 </div>
-                                <p className="text-xs text-[#475569] mt-0.5 line-clamp-1">
+                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                                   {service.description}
                                 </p>
-                                <div className="flex items-center gap-2 mt-2 text-[11px] text-[#475569] tabular-nums">
+                                <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-500 tabular-nums">
                                   <span>{service.category}</span>
                                   <span>·</span>
                                   <span className="text-orange-700 font-semibold">
@@ -1059,8 +1302,8 @@ export default function NakaSetuApp() {
                             <span
                               className={`font-mono text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 tabular-nums ${
                                 isSelected
-                                  ? 'bg-[#1D4ED8] text-white border border-[#1E40AF] font-bold'
-                                  : 'bg-[#DBEAFE] text-[#1E3A8A] border border-[#93C5FD]'
+                                  ? 'bg-[#1D4ED8] text-white font-bold'
+                                  : 'bg-slate-100 text-slate-800 border border-slate-200'
                               }`}
                             >
                               {service.rateDisplay}
@@ -1071,55 +1314,118 @@ export default function NakaSetuApp() {
                     </div>
                   </div>
 
-                  {/* Right 5 Columns: Booking Configuration & Verified Trust Flow */}
-                  <div className="lg:col-span-5 bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-5 space-y-5">
-                    <div className="pb-4 border-b border-[#BFDBFE] flex items-center justify-between">
+                  {/* Right 5 Columns: Booking Configuration & Price Calculator */}
+                  <div className="lg:col-span-5 bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-5 space-y-5">
+                    <div className="pb-4 border-b border-slate-200 flex items-center justify-between">
                       <div>
-                        <span className="text-[11px] font-mono font-semibold text-[#1E3A8A]">
-                          DISPATCH CONFIGURATION
+                        <span className="text-[11px] font-mono font-semibold text-slate-500">
+                          {t.dispatchConfig}
                         </span>
-                        <h3 className="text-base font-semibold text-[#0F172A] mt-0.5">
-                          {selectedService.label}
+                        <h3 className="text-base font-semibold text-slate-900 mt-0.5">
+                          {lang === 'hi' ? selectedService.labelHi : selectedService.label}
                         </h3>
                       </div>
-                      <span className="font-mono text-sm font-bold text-orange-800 bg-orange-100 border border-orange-300 px-3 py-1 rounded-full tabular-nums">
+                      <span className="font-mono text-sm font-bold text-orange-800 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full tabular-nums">
                         {selectedService.rateDisplay}
                       </span>
                     </div>
 
-                    {/* Customer Verification Trust Pill Box (Semantic Green Preserved) */}
-                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center gap-2.5 text-xs text-emerald-900">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="leading-relaxed font-medium">
-                        Customer Verified: Phone OTP (+91 98201 •••••) • Geo-Locked • Zero Advance Fee
-                      </span>
+                    {/* Helper Count & Hours Price Calculator */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                          <Calculator className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                          <span>{t.calculatorTitle}</span>
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-500 tabular-nums">
+                          Base: ₹{selectedService.baseRate}/{selectedService.unit}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Helper Count Selector */}
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                            {t.helpersLabel}
+                          </label>
+                          <div className="grid grid-cols-3 gap-1 bg-white p-1 border border-slate-200 rounded-lg">
+                            {[1, 2, 3].map((count) => (
+                              <button
+                                key={count}
+                                type="button"
+                                onClick={() => setHelperCount(count)}
+                                className={`py-1 text-xs font-mono font-semibold rounded transition-colors cursor-pointer ${
+                                  helperCount === count
+                                    ? 'bg-[#1D4ED8] text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {count === 1 ? '1 Solo' : `${count}x`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Duration / Units Selector */}
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                            {t.durationLabel} ({selectedService.unitLabel})
+                          </label>
+                          <div className="grid grid-cols-4 gap-1 bg-white p-1 border border-slate-200 rounded-lg">
+                            {[1, 2, 3, 4].map((hrs) => (
+                              <button
+                                key={hrs}
+                                type="button"
+                                onClick={() => setDurationUnits(hrs)}
+                                className={`py-1 text-xs font-mono font-semibold rounded transition-colors cursor-pointer ${
+                                  durationUnits === hrs
+                                    ? 'bg-[#1D4ED8] text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {hrs}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs tabular-nums">
+                        <span className="text-slate-600 font-medium">
+                          {t.estimatedTotal} ({helperCount} worker × {durationUnits}{' '}
+                          {selectedService.unitLabel})
+                        </span>
+                        <span className="font-mono text-sm font-bold text-[#1D4ED8]">
+                          ₹{estimatedTotal}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Urgency Selector */}
                     <div className="space-y-2">
-                      <label className="block text-xs font-semibold text-[#0F172A]">
-                        Urgency Selector
+                      <label className="block text-xs font-semibold text-slate-800">
+                        {t.urgencyLabel}
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <button
                           type="button"
                           onClick={() => setUrgency('immediate')}
-                          className={`p-3.5 rounded-xl text-left transition-all cursor-pointer ${
+                          className={`p-3 rounded-xl text-left transition-all cursor-pointer ${
                             urgency === 'immediate'
-                              ? 'bg-[#BFDBFE]/65 border-2 border-[#1D4ED8] shadow-sm shadow-[#1D4ED8]/15'
-                              : 'bg-[#DBEAFE]/60 border border-[#93C5FD] text-[#0F172A] hover:bg-white'
+                              ? 'bg-blue-50/60 border-2 border-[#1D4ED8]'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#0F172A] flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                               <Zap className="w-3.5 h-3.5 text-orange-600" />
-                              <span>Under 30 Mins</span>
+                              <span>{t.under30Mins}</span>
                             </span>
                             <span
                               className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                                 urgency === 'immediate'
                                   ? 'border-[#1D4ED8] bg-[#1D4ED8]'
-                                  : 'border-[#93C5FD] bg-white'
+                                  : 'border-slate-300 bg-white'
                               }`}
                             >
                               {urgency === 'immediate' && (
@@ -1127,7 +1433,7 @@ export default function NakaSetuApp() {
                               )}
                             </span>
                           </div>
-                          <p className="text-[11px] text-[#475569] mt-1">
+                          <p className="text-[11px] text-slate-500 mt-1">
                             Immediate 3 km radar &amp; IVR voice blast
                           </p>
                         </button>
@@ -1135,22 +1441,22 @@ export default function NakaSetuApp() {
                         <button
                           type="button"
                           onClick={() => setUrgency('scheduled')}
-                          className={`p-3.5 rounded-xl text-left transition-all cursor-pointer ${
+                          className={`p-3 rounded-xl text-left transition-all cursor-pointer ${
                             urgency === 'scheduled'
-                              ? 'bg-[#BFDBFE]/65 border-2 border-[#1D4ED8] shadow-sm shadow-[#1D4ED8]/15'
-                              : 'bg-[#DBEAFE]/60 border border-[#93C5FD] text-[#0F172A] hover:bg-white'
+                              ? 'bg-blue-50/60 border-2 border-[#1D4ED8]'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#0F172A] flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5 text-orange-600" />
-                              <span>Scheduled</span>
+                              <span>{t.scheduled}</span>
                             </span>
                             <span
                               className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                                 urgency === 'scheduled'
                                   ? 'border-[#1D4ED8] bg-[#1D4ED8]'
-                                  : 'border-[#93C5FD] bg-white'
+                                  : 'border-slate-300 bg-white'
                               }`}
                             >
                               {urgency === 'scheduled' && (
@@ -1158,7 +1464,7 @@ export default function NakaSetuApp() {
                               )}
                             </span>
                           </div>
-                          <p className="text-[11px] text-[#475569] mt-1">
+                          <p className="text-[11px] text-slate-500 mt-1">
                             Pre-assign a verified Naka worker or toli
                           </p>
                         </button>
@@ -1168,7 +1474,7 @@ export default function NakaSetuApp() {
                         <div className="pt-1.5 space-y-1">
                           <label
                             htmlFor="scheduled-slot-select"
-                            className="block text-[11px] font-semibold text-[#1E3A8A]"
+                            className="block text-[11px] font-semibold text-slate-700"
                           >
                             Choose 1-Hour Arrival Slot (17 Windows Available):
                           </label>
@@ -1176,7 +1482,7 @@ export default function NakaSetuApp() {
                             id="scheduled-slot-select"
                             value={scheduledSlot}
                             onChange={(e) => setScheduledSlot(e.target.value)}
-                            className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] font-medium focus:outline-none focus:border-[#1D4ED8]"
+                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 font-medium focus:outline-none focus:border-[#1D4ED8]"
                           >
                             {SCHEDULE_TIME_SLOTS.map((group) => (
                               <optgroup key={group.group} label={group.group}>
@@ -1196,30 +1502,30 @@ export default function NakaSetuApp() {
                     <div className="space-y-1.5">
                       <label
                         htmlFor="task-note-input"
-                        className="block text-xs font-semibold text-[#0F172A]"
+                        className="block text-xs font-semibold text-slate-800"
                       >
                         Task Note &amp; Landmark
                       </label>
                       <textarea
                         id="task-note-input"
-                        rows={3}
+                        rows={2}
                         value={taskNote}
                         onChange={(e) => setTaskNote(e.target.value)}
                         placeholder="Enter flat number, landmark, and brief task details..."
-                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8] resize-none shadow-2xs"
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8] resize-none"
                       />
                     </div>
 
                     {/* Simulated Photo Attachment */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-[#0F172A]">
+                        <span className="text-xs font-semibold text-slate-800">
                           Task Media Attachment
                         </span>
                         <button
                           type="button"
                           onClick={() => setAttachedPhoto((prev) => !prev)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#93C5FD] bg-[#DBEAFE] hover:bg-[#BFDBFE] text-[#1E3A8A] transition-colors cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 transition-colors cursor-pointer"
                         >
                           <Camera className="w-3.5 h-3.5 text-orange-600" />
                           <span>{attachedPhoto ? 'Remove Photo' : 'Attach Photo'}</span>
@@ -1227,16 +1533,16 @@ export default function NakaSetuApp() {
                       </div>
 
                       {attachedPhoto && (
-                        <div className="p-2.5 bg-[#DBEAFE]/60 border border-[#93C5FD] rounded-xl flex items-center justify-between gap-3">
+                        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-11 h-11 rounded-lg border border-[#93C5FD] bg-white shrink-0 overflow-hidden flex items-center justify-center">
+                            <div className="w-11 h-11 rounded-lg border border-slate-200 bg-white shrink-0 overflow-hidden flex items-center justify-center">
                               <svg
                                 viewBox="0 0 64 64"
                                 className="w-full h-full"
                                 role="img"
                                 aria-label="sink_leakage.jpg preview"
                               >
-                                <rect width="64" height="64" fill="#DBEAFE" />
+                                <rect width="64" height="64" fill="#EFF6FF" />
                                 <path
                                   d="M14 20 H36 V32 H50"
                                   stroke="#1E3A8A"
@@ -1256,11 +1562,11 @@ export default function NakaSetuApp() {
                               </svg>
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 text-xs font-mono font-semibold text-[#0F172A] truncate">
+                              <div className="flex items-center gap-1.5 text-xs font-mono font-semibold text-slate-900 truncate">
                                 <FileImage className="w-3.5 h-3.5 text-[#1D4ED8] shrink-0" />
                                 <span>sink_leakage.jpg</span>
                               </div>
-                              <p className="text-[11px] text-[#475569] mt-0.5">
+                              <p className="text-[11px] text-slate-500 mt-0.5">
                                 1.2 MB · Attached to dispatch ticket
                               </p>
                             </div>
@@ -1269,7 +1575,7 @@ export default function NakaSetuApp() {
                             type="button"
                             onClick={() => setAttachedPhoto(false)}
                             aria-label="Remove attached photo"
-                            className="p-1 text-[#475569] hover:text-[#0F172A] rounded cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1278,14 +1584,16 @@ export default function NakaSetuApp() {
                     </div>
 
                     {/* Broadcast CTA */}
-                    <div className="pt-2 border-t border-[#BFDBFE]">
+                    <div className="pt-2 border-t border-slate-200">
                       <button
                         type="button"
                         onClick={handleBroadcastRequest}
-                        className="w-full py-3 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                        className="w-full py-3 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                       >
                         <Radio className="w-4 h-4 text-orange-300" />
-                        <span>Broadcast Request (3 km)</span>
+                        <span>
+                          {t.broadcastBtn} · ₹{estimatedTotal}
+                        </span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -1294,18 +1602,18 @@ export default function NakaSetuApp() {
               )}
 
               {/* =============================================================
-                  STEP 2: INTERACTIVE MATCH RADAR WITH DEEP BLUE RINGS
+                  STEP 2: INTERACTIVE MATCH RADAR
               ============================================================= */}
               {customerStep === 'matching' && (
-                <div className="max-w-2xl mx-auto bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-8 text-center space-y-6">
+                <div className="max-w-2xl mx-auto bg-white border border-slate-200 shadow-2xs rounded-2xl p-8 text-center space-y-6">
                   {/* Radar Rings */}
                   <div className="relative w-44 h-44 mx-auto flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-full border-2 border-[#1D4ED8]/45 animate-ping opacity-40" />
-                    <div className="absolute inset-4 rounded-full border border-[#1D4ED8]/35 bg-[#DBEAFE]/60 animate-pulse" />
-                    <div className="absolute inset-10 rounded-full border border-[#93C5FD] bg-white shadow-inner" />
+                    <div className="absolute inset-0 rounded-full border-2 border-[#1D4ED8]/40 animate-ping opacity-40" />
+                    <div className="absolute inset-4 rounded-full border border-[#1D4ED8]/30 bg-blue-50/50 animate-pulse" />
+                    <div className="absolute inset-10 rounded-full border border-slate-200 bg-white shadow-inner" />
                     <span className="absolute top-6 left-11 w-2.5 h-2.5 rounded-full bg-orange-600 shadow-xs" />
                     <span className="absolute top-12 right-7 w-2.5 h-2.5 rounded-full bg-[#1D4ED8] shadow-xs" />
-                    <span className="absolute bottom-9 left-9 w-2.5 h-2.5 rounded-full bg-[#0F172A] shadow-xs" />
+                    <span className="absolute bottom-9 left-9 w-2.5 h-2.5 rounded-full bg-slate-900 shadow-xs" />
                     <span className="absolute bottom-7 right-12 w-2.5 h-2.5 rounded-full bg-orange-600 shadow-xs" />
                     <div className="relative w-14 h-14 rounded-2xl bg-[#1D4ED8] text-white flex items-center justify-center shadow-md">
                       <Radio className="w-6 h-6 animate-pulse" />
@@ -1313,29 +1621,32 @@ export default function NakaSetuApp() {
                   </div>
 
                   <div className="space-y-2">
-                    <span className="inline-block font-mono text-[11px] font-semibold text-orange-800 bg-orange-100 border border-orange-300 px-3 py-1 rounded-full">
+                    <span className="inline-block font-mono text-[11px] font-semibold text-orange-800 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full">
                       3 KM GEOFENCE RADAR ACTIVE
                     </span>
-                    <h2 className="text-lg font-semibold text-[#0F172A]">
+                    <h2 className="text-lg font-semibold text-slate-900">
                       Broadcasting to 6 nearby verified workers...
                     </h2>
-                    <p className="text-xs text-[#475569] max-w-md mx-auto">
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
                       Pinging smartphone partners via FCM push and dialing offline Naka leads on automated bilingual IVR.
                     </p>
                   </div>
 
-                  <div className="bg-[#DBEAFE]/60 border border-[#93C5FD] rounded-xl p-4 max-w-md mx-auto text-left text-xs space-y-2 font-mono tabular-nums">
-                    <div className="flex justify-between text-[#475569]">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-w-md mx-auto text-left text-xs space-y-2 font-mono tabular-nums">
+                    <div className="flex justify-between text-slate-500">
                       <span>Selected Service:</span>
-                      <strong className="text-[#0F172A]">{selectedService.label}</strong>
+                      <strong className="text-slate-900">{selectedService.label}</strong>
                     </div>
-                    <div className="flex justify-between text-[#475569]">
-                      <span>Locked Tariff:</span>
-                      <strong className="text-orange-700">{selectedService.rateDisplay}</strong>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Scope &amp; Locked Tariff:</span>
+                      <strong className="text-orange-700">
+                        {helperCount}x Worker · {durationUnits} {selectedService.unitLabel} · ₹
+                        {estimatedTotal}
+                      </strong>
                     </div>
-                    <div className="flex justify-between text-[#475569]">
+                    <div className="flex justify-between text-slate-500">
                       <span>Urgency Window:</span>
-                      <strong className="text-[#1E3A8A]">
+                      <strong className="text-[#1D4ED8]">
                         {urgency === 'immediate' ? 'Under 30 Mins' : scheduledSlot}
                       </strong>
                     </div>
@@ -1349,8 +1660,8 @@ export default function NakaSetuApp() {
               {customerStep === 'assigned' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   {/* Left 7 Columns: Matched Worker Card & Previous Customer Reviews */}
-                  <div className="lg:col-span-7 bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-6 space-y-5">
-                    <div className="flex flex-wrap items-start justify-between gap-2 pb-4 border-b border-[#BFDBFE]">
+                  <div className="lg:col-span-7 bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-6 space-y-5">
+                    <div className="flex flex-wrap items-start justify-between gap-2 pb-4 border-b border-slate-200">
                       <div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -1358,11 +1669,11 @@ export default function NakaSetuApp() {
                             Matched Worker En Route (Dispatched &amp; Traveling to You)
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#475569] mt-1">
-                          Your nearest verified professional has accepted the broadcast and is currently riding from Station Road Chowk Naka to your address.
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Your nearest verified professional has accepted the broadcast and is riding from Station Road Chowk Naka to your address.
                         </p>
                       </div>
-                      <span className="font-mono text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-300 px-3 py-1 rounded-full tabular-nums shrink-0">
+                      <span className="font-mono text-xs font-semibold text-orange-800 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full tabular-nums shrink-0">
                         Arriving in 14 mins
                       </span>
                     </div>
@@ -1370,7 +1681,7 @@ export default function NakaSetuApp() {
                     {/* Worker Identity */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-[#DBEAFE] border border-[#93C5FD] flex items-center justify-center shrink-0 overflow-hidden">
+                        <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0 overflow-hidden">
                           <svg
                             viewBox="0 0 80 80"
                             className="w-full h-full"
@@ -1388,17 +1699,17 @@ export default function NakaSetuApp() {
 
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-lg font-semibold text-[#0F172A]">
+                            <h2 className="text-lg font-semibold text-slate-900">
                               Ramesh Pawar
                             </h2>
-                            <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-orange-900 bg-orange-100 border border-orange-300 px-2.5 py-0.5 rounded-full tabular-nums">
+                            <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-orange-900 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full tabular-nums">
                               4.9 ★
                             </span>
                           </div>
-                          <p className="text-xs text-[#475569] font-medium mt-0.5">
+                          <p className="text-xs text-slate-500 font-medium mt-0.5">
                             Senior {selectedService.label} · Station Road Chowk Naka
                           </p>
-                          <div className="flex items-center gap-2 mt-1.5 text-xs font-mono text-[#1E3A8A]">
+                          <div className="flex items-center gap-2 mt-1.5 text-xs font-mono text-slate-600">
                             <Bike className="w-3.5 h-3.5 text-orange-600" />
                             <span>Vehicle: MH-02-EF-4918</span>
                           </div>
@@ -1408,52 +1719,52 @@ export default function NakaSetuApp() {
                       <button
                         type="button"
                         onClick={() => setIsMaskedCallModalOpen(true)}
-                        className="px-4 py-2.5 bg-[#DBEAFE] hover:bg-[#BFDBFE] border border-[#93C5FD] text-[#1E3A8A] shadow-xs text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-2 self-start sm:self-center shrink-0 cursor-pointer"
+                        className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 shadow-2xs text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-2 self-start sm:self-center shrink-0 cursor-pointer"
                       >
                         <PhoneCall className="w-3.5 h-3.5 text-[#1D4ED8]" />
                         <span>Call via Masked Number</span>
                       </button>
                     </div>
 
-                    {/* Verification Badges (Semantic Green Preserved for Verification) */}
+                    {/* Verification Badges */}
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-full">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                         Aadhaar Verified
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-full">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                         Police Background Checked
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1E3A8A] bg-[#DBEAFE] border border-[#93C5FD] px-3 py-1 rounded-full font-mono tabular-nums">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full font-mono tabular-nums">
                         418 Completed Jobs
                       </span>
                     </div>
 
                     {/* Job Context Summary */}
-                    <div className="bg-[#DBEAFE]/50 border border-[#93C5FD] rounded-xl p-4 space-y-2 text-xs">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs tabular-nums">
                       <div className="flex justify-between">
-                        <span className="text-[#475569]">Service Tier</span>
-                        <span className="font-semibold text-[#0F172A]">
-                          {selectedService.label} ({selectedService.rateDisplay})
+                        <span className="text-slate-500">Booked Scope &amp; Tariff</span>
+                        <span className="font-semibold text-slate-900">
+                          {selectedService.label} · {helperCount}x Worker · ₹{estimatedTotal}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#475569]">Landmark Note</span>
-                        <span className="font-medium text-[#0F172A] text-right max-w-xs truncate">
+                        <span className="text-slate-500">Landmark Note</span>
+                        <span className="font-medium text-slate-800 text-right max-w-xs truncate">
                           {taskNote}
                         </span>
                       </div>
                     </div>
 
                     {/* Previous Verified Customer Reviews Section */}
-                    <div className="pt-2 border-t border-[#BFDBFE] space-y-3">
+                    <div className="pt-2 border-t border-slate-200 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-[#0F172A] flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                           <MessageSquareQuote className="w-4 h-4 text-orange-600" />
                           <span>Recent Verified Customer Reviews ({workerReviews.length})</span>
                         </span>
-                        <span className="text-[11px] font-mono text-[#1E3A8A]">
+                        <span className="text-[11px] font-mono text-slate-500">
                           100% OTP-Verified Bookings
                         </span>
                       </div>
@@ -1462,34 +1773,34 @@ export default function NakaSetuApp() {
                         {workerReviews.map((rev) => (
                           <div
                             key={rev.id}
-                            className="p-3 rounded-xl bg-[#DBEAFE]/40 border border-[#93C5FD] text-xs space-y-1.5"
+                            className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[#0F172A]">
+                                <span className="font-semibold text-slate-900">
                                   {rev.reviewerName}
                                 </span>
-                                <span className="text-[11px] text-[#475569]">
+                                <span className="text-[11px] text-slate-500">
                                   · {rev.locality}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-mono text-[11px] font-bold text-orange-800 bg-orange-100 border border-orange-300 px-2 py-0.5 rounded-full">
+                                <span className="font-mono text-[11px] font-bold text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
                                   {rev.rating}.0 ★
                                 </span>
-                                <span className="text-[11px] text-[#475569] font-mono">
+                                <span className="text-[11px] text-slate-500 font-mono">
                                   {rev.date}
                                 </span>
                               </div>
                             </div>
-                            <p className="text-[#0F172A] leading-relaxed">
+                            <p className="text-slate-700 leading-relaxed">
                               &ldquo;{rev.comment}&rdquo;
                             </p>
                             <div className="flex flex-wrap gap-1.5 pt-0.5">
                               {rev.tags.map((tag) => (
                                 <span
                                   key={tag}
-                                  className="text-[10px] font-semibold text-[#1E3A8A] bg-white border border-[#93C5FD] px-2 py-0.5 rounded-full"
+                                  className="text-[10px] font-semibold text-[#1D4ED8] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full"
                                 >
                                   ✓ {tag}
                                 </span>
@@ -1502,12 +1813,12 @@ export default function NakaSetuApp() {
                   </div>
 
                   {/* Right 5 Columns: Dual Start/Stop OTP & Safety Controls */}
-                  <div className="lg:col-span-5 bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-6 space-y-5">
-                    <div className="pb-3.5 border-b border-[#BFDBFE]">
-                      <span className="text-[11px] font-mono font-semibold text-[#1E3A8A]">
+                  <div className="lg:col-span-5 bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-6 space-y-5">
+                    <div className="pb-3.5 border-b border-slate-200">
+                      <span className="text-[11px] font-mono font-semibold text-slate-500">
                         DUAL HANDSHAKE PROTOCOL
                       </span>
-                      <h3 className="text-base font-semibold text-[#0F172A] mt-0.5">
+                      <h3 className="text-base font-semibold text-slate-900 mt-0.5">
                         Start &amp; Stop OTP Verification
                       </h3>
                     </div>
@@ -1515,9 +1826,9 @@ export default function NakaSetuApp() {
                     {/* Dual Start OTP & Stop OTP Display */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Start OTP */}
-                      <div className="bg-[#DBEAFE]/70 border border-[#93C5FD] rounded-xl p-3.5 space-y-2.5">
+                      <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-[#0F172A] flex items-center gap-1">
+                          <span className="text-[11px] font-semibold text-slate-900 flex items-center gap-1">
                             <Lock className="w-3 h-3 text-[#1D4ED8]" />
                             Start OTP (On Arrival)
                           </span>
@@ -1529,21 +1840,21 @@ export default function NakaSetuApp() {
                           {['4', '8', '2', '1'].map((digit, i) => (
                             <div
                               key={i}
-                              className="py-2 bg-white border border-[#1D4ED8] rounded-lg text-center font-mono text-base font-bold text-[#1E3A8A] shadow-2xs tabular-nums"
+                              className="py-2 bg-white border border-blue-300 rounded-lg text-center font-mono text-base font-bold text-[#1D4ED8] shadow-2xs tabular-nums"
                             >
                               {digit}
                             </div>
                           ))}
                         </div>
-                        <p className="text-[11px] text-[#475569]">
+                        <p className="text-[11px] text-slate-500">
                           Unlocks job session &amp; insurance cover
                         </p>
                       </div>
 
                       {/* Stop OTP */}
-                      <div className="bg-orange-50/80 border border-orange-300 rounded-xl p-3.5 space-y-2.5">
+                      <div className="bg-orange-50/60 border border-orange-200 rounded-xl p-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-[#0F172A] flex items-center gap-1">
+                          <span className="text-[11px] font-semibold text-slate-900 flex items-center gap-1">
                             <KeyRound className="w-3 h-3 text-orange-600" />
                             Stop OTP (On Completion)
                           </span>
@@ -1555,19 +1866,19 @@ export default function NakaSetuApp() {
                           {['9', '3', '0', '6'].map((digit, i) => (
                             <div
                               key={i}
-                              className="py-2 bg-white border border-orange-400 rounded-lg text-center font-mono text-base font-bold text-orange-900 shadow-2xs tabular-nums"
+                              className="py-2 bg-white border border-orange-300 rounded-lg text-center font-mono text-base font-bold text-orange-800 shadow-2xs tabular-nums"
                             >
                               {digit}
                             </div>
                           ))}
                         </div>
-                        <p className="text-[11px] text-[#475569]">
+                        <p className="text-[11px] text-slate-500">
                           Share only after inspecting completed work
                         </p>
                       </div>
                     </div>
 
-                    {/* Emergency SOS (Semantic Red Preserved) */}
+                    {/* Emergency SOS */}
                     <div className="p-3.5 rounded-xl bg-red-50/80 border border-red-200 flex items-center justify-between gap-3">
                       <div>
                         <div className="text-xs font-semibold text-red-900">
@@ -1588,11 +1899,11 @@ export default function NakaSetuApp() {
                     </div>
 
                     {/* Proceed to Settlement */}
-                    <div className="pt-2 border-t border-[#BFDBFE]">
+                    <div className="pt-2 border-t border-slate-200">
                       <button
                         type="button"
                         onClick={() => setCustomerStep('settlement')}
-                        className="w-full py-3 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                        className="w-full py-3 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Verify Stop OTP &amp; Mark Job Completed</span>
@@ -1607,51 +1918,58 @@ export default function NakaSetuApp() {
                   STEP 4: SETTLEMENT, WRITE A REVIEW & TWO-WAY RATING
               ============================================================= */}
               {customerStep === 'settlement' && (
-                <div className="max-w-3xl mx-auto bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-6 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#BFDBFE]">
+                <div className="max-w-3xl mx-auto bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-6 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-200">
                     <div>
-                      <span className="text-[11px] font-mono font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full">
+                      <span className="text-[11px] font-mono font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                         ZERO PLATFORM COMMISSION · 100% TO WORKER
                       </span>
-                      <h2 className="text-lg font-semibold text-[#0F172A] mt-2">
+                      <h2 className="text-lg font-semibold text-slate-900 mt-2">
                         Settlement &amp; Two-Way Rating
                       </h2>
                     </div>
-                    <div className="text-xs font-mono text-[#475569] tabular-nums">
-                      Invoice #INV-8841 · Worker: Ramesh Pawar
+                    <div className="text-xs font-mono text-slate-500 tabular-nums">
+                      Worker: Ramesh Pawar · Start #4821 / Stop #9306
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Left Column: Itemized Bill & UPI QR Modal Trigger */}
                     <div className="space-y-4">
-                      <div className="bg-[#DBEAFE]/55 border border-[#93C5FD] rounded-xl p-4 space-y-2.5 text-xs tabular-nums">
-                        <div className="font-semibold text-[#0F172A] pb-2 border-b border-[#93C5FD]">
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5 text-xs tabular-nums">
+                        <div className="font-semibold text-slate-900 pb-2 border-b border-slate-200">
                           Itemized Breakdown ({selectedService.label})
                         </div>
-                        <div className="flex justify-between text-[#475569]">
-                          <span>Labor base</span>
-                          <span className="font-mono font-semibold text-[#0F172A]">
-                            ₹{selectedService.baseRate}
+                        <div className="flex justify-between text-slate-600">
+                          <span>Base rate</span>
+                          <span className="font-mono font-semibold text-slate-900">
+                            ₹{selectedService.baseRate} / {selectedService.unit}
                           </span>
                         </div>
-                        <div className="flex justify-between text-[#475569]">
+                        <div className="flex justify-between text-slate-600">
+                          <span>Multiplier</span>
+                          <span className="font-mono font-semibold text-slate-900">
+                            {helperCount} worker(s) × {durationUnits}{' '}
+                            {selectedService.unitLabel}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
                           <span>Platform fee</span>
                           <span className="font-mono font-semibold text-emerald-700">
                             ₹0
                           </span>
                         </div>
-                        <div className="pt-2 border-t border-[#93C5FD] flex justify-between text-sm font-bold text-[#0F172A]">
+                        <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-bold text-slate-900">
                           <span>Total Payable</span>
                           <span className="font-mono text-orange-700">
-                            ₹{selectedService.baseRate}
+                            ₹{estimatedTotal}
                           </span>
                         </div>
                       </div>
 
                       {/* Payment Mode Toggle */}
                       <div className="space-y-2.5">
-                        <label className="block text-xs font-semibold text-[#0F172A]">
+                        <label className="block text-xs font-semibold text-slate-800">
                           Direct Worker Settlement Mode
                         </label>
                         <div className="grid grid-cols-2 gap-2">
@@ -1660,8 +1978,8 @@ export default function NakaSetuApp() {
                             onClick={() => setPaymentMethod('upi')}
                             className={`py-2 px-3 rounded-xl border text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                               paymentMethod === 'upi'
-                                ? 'bg-[#1D4ED8] text-white border-[#1E40AF] shadow-xs'
-                                : 'bg-white text-[#0F172A] border-[#93C5FD] hover:bg-[#DBEAFE]/50'
+                                ? 'bg-[#1D4ED8] text-white border-[#1D4ED8] shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             <QrCode className="w-3.5 h-3.5" />
@@ -1672,8 +1990,8 @@ export default function NakaSetuApp() {
                             onClick={() => setPaymentMethod('cash')}
                             className={`py-2 px-3 rounded-xl border text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                               paymentMethod === 'cash'
-                                ? 'bg-[#1D4ED8] text-white border-[#1E40AF] shadow-xs'
-                                : 'bg-white text-[#0F172A] border-[#93C5FD] hover:bg-[#DBEAFE]/50'
+                                ? 'bg-[#1D4ED8] text-white border-[#1D4ED8] shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             <Banknote className="w-3.5 h-3.5" />
@@ -1682,9 +2000,9 @@ export default function NakaSetuApp() {
                         </div>
 
                         {paymentMethod === 'upi' ? (
-                          <div className="p-4 bg-[#DBEAFE]/50 border border-[#93C5FD] rounded-xl flex items-center justify-between gap-4">
+                          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3.5">
-                              <div className="w-16 h-16 bg-white p-1.5 border border-[#93C5FD] rounded-lg shrink-0">
+                              <div className="w-16 h-16 bg-white p-1.5 border border-slate-200 rounded-lg shrink-0">
                                 <svg
                                   viewBox="0 0 64 64"
                                   className="w-full h-full"
@@ -1709,10 +2027,10 @@ export default function NakaSetuApp() {
                                 </svg>
                               </div>
                               <div className="space-y-1 text-xs">
-                                <div className="font-semibold text-[#0F172A]">
+                                <div className="font-semibold text-slate-900">
                                   rameshpawar.naka@upi
                                 </div>
-                                <p className="text-[11px] text-[#475569]">
+                                <p className="text-[11px] text-slate-500">
                                   Instant bank settlement + Hindi audio box alert
                                 </p>
                               </div>
@@ -1720,17 +2038,17 @@ export default function NakaSetuApp() {
                             <button
                               type="button"
                               onClick={() => setIsUpiQrModalOpen(true)}
-                              className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#DBEAFE] border border-[#93C5FD] text-xs font-semibold text-[#1E3A8A] shrink-0 cursor-pointer shadow-2xs"
+                              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs font-semibold text-slate-800 shrink-0 cursor-pointer"
                             >
                               Enlarge QR
                             </button>
                           </div>
                         ) : (
-                          <div className="p-4 bg-[#DBEAFE]/50 border border-[#93C5FD] rounded-xl text-xs space-y-1">
-                            <div className="font-semibold text-[#0F172A]">
-                              Hand ₹{selectedService.baseRate} Cash directly to Ramesh Pawar
+                          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                            <div className="font-semibold text-slate-900">
+                              Hand ₹{estimatedTotal} Cash directly to Ramesh Pawar
                             </div>
-                            <p className="text-[#475569]">
+                            <p className="text-slate-500">
                               Digital SMS receipt is sent automatically to both parties.
                             </p>
                           </div>
@@ -1738,9 +2056,9 @@ export default function NakaSetuApp() {
                       </div>
 
                       {/* Worker Rates Customer Reciprocity Indicator */}
-                      <div className="p-3.5 rounded-xl bg-orange-50/90 border border-orange-300 space-y-1.5">
+                      <div className="p-3.5 rounded-xl bg-orange-50/70 border border-orange-200 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-[#0F172A] inline-flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-900 inline-flex items-center gap-1.5">
                             <ArrowLeftRight className="w-3.5 h-3.5 text-orange-600" />
                             Worker Rates Customer (Reciprocity Active)
                           </span>
@@ -1748,7 +2066,7 @@ export default function NakaSetuApp() {
                             Customer Score: 4.95 ★
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#475569] leading-relaxed">
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
                           Ramesh Pawar also rates your household via IVR/App on respectful conduct, accurate scope &amp; prompt settlement.
                         </p>
                       </div>
@@ -1758,7 +2076,7 @@ export default function NakaSetuApp() {
                     <div className="space-y-4 flex flex-col justify-between">
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold text-[#0F172A]">
+                          <label className="block text-xs font-semibold text-slate-800">
                             Rate Ramesh Pawar ({customerRating}/5 ★)
                           </label>
                           <div className="flex items-center gap-2">
@@ -1772,8 +2090,8 @@ export default function NakaSetuApp() {
                                   aria-label={`Rate ${starValue} stars`}
                                   className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
                                     active
-                                      ? 'bg-orange-100 border-orange-500 text-orange-600 shadow-2xs'
-                                      : 'bg-white border-[#93C5FD] text-slate-300 hover:border-[#1D4ED8]'
+                                      ? 'bg-orange-50 border-orange-400 text-orange-500 shadow-2xs'
+                                      : 'bg-white border-slate-200 text-slate-300 hover:border-slate-300'
                                   }`}
                                 >
                                   <Star
@@ -1788,7 +2106,7 @@ export default function NakaSetuApp() {
 
                         {/* Commendation Tags */}
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold text-[#0F172A]">
+                          <label className="block text-xs font-semibold text-slate-800">
                             Feedback Badges
                           </label>
                           <div className="flex flex-wrap gap-2">
@@ -1801,8 +2119,8 @@ export default function NakaSetuApp() {
                                   onClick={() => handleToggleFeedbackTag(tag)}
                                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                                     isSelected
-                                      ? 'bg-[#DBEAFE] border-[#1D4ED8] text-[#1E3A8A]'
-                                      : 'bg-white border-[#93C5FD] text-[#475569] hover:border-[#1D4ED8]'
+                                      ? 'bg-blue-50 border-[#1D4ED8] text-[#1D4ED8]'
+                                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                                   }`}
                                 >
                                   {isSelected ? `✓ ${tag}` : tag}
@@ -1816,7 +2134,7 @@ export default function NakaSetuApp() {
                         <div className="space-y-1.5">
                           <label
                             htmlFor="write-review-input"
-                            className="block text-xs font-semibold text-[#0F172A]"
+                            className="block text-xs font-semibold text-slate-800"
                           >
                             Write a Review for Ramesh Pawar
                           </label>
@@ -1826,19 +2144,19 @@ export default function NakaSetuApp() {
                             value={writtenReviewText}
                             onChange={(e) => setWrittenReviewText(e.target.value)}
                             placeholder="Share how Ramesh performed (e.g., arrived on time, neat repair, transparent pricing)..."
-                            className="w-full px-3.5 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8] resize-none shadow-2xs"
+                            className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8] resize-none"
                           />
                         </div>
                       </div>
 
-                      <div className="pt-3 border-t border-[#BFDBFE]">
+                      <div className="pt-3 border-t border-slate-200">
                         <button
                           type="button"
                           onClick={handleFinishAndReset}
-                          className="w-full py-3 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                          className="w-full py-3 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                         >
                           <CheckCircle2 className="w-4 h-4" />
-                          <span>Submit Review, Finish &amp; Reset</span>
+                          <span>Submit Review, Save Receipt &amp; Reset</span>
                         </button>
                       </div>
                     </div>
@@ -1854,24 +2172,34 @@ export default function NakaSetuApp() {
               {/* =============================================================
                   1. OFFLINE WORKER ENROLLMENT FORM (FEATURE-PHONE & NAKA DESK)
               ============================================================= */}
-              <div className="bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#BFDBFE]">
+              <div className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-200">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[#DBEAFE] border border-[#93C5FD] text-[#1D4ED8] flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 text-[#1D4ED8] flex items-center justify-center shrink-0">
                       <UserPlus className="w-4 h-4" />
                     </div>
                     <div>
-                      <h2 className="text-sm font-semibold text-[#0F172A]">
-                        Helpline &amp; Naka Registration Desk (For Feature-Phone Workers)
+                      <h2 className="text-sm font-semibold text-slate-900">
+                        {t.opsFormTitle}
                       </h2>
-                      <p className="text-xs text-[#475569] mt-0.5">
-                        Fast registration for offline walk-ins and basic-phone callers with Toli capacity selector
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Fast registration for offline walk-ins and basic-phone callers (automatically saved in browser storage)
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-mono font-semibold text-orange-800 bg-orange-100 border border-orange-300 px-3 py-1 rounded-full self-start sm:self-center shrink-0">
-                    2G Voice &amp; SMS Loop Ready
-                  </span>
+                  <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                    <span className="text-[11px] font-mono font-semibold text-orange-800 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full">
+                      2G Voice &amp; SMS Loop Ready
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResetSavedStorage}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-medium cursor-pointer"
+                      title="Reset saved localStorage workers and reviews"
+                    >
+                      Reset Saved Data
+                    </button>
+                  </div>
                 </div>
 
                 <form onSubmit={handleRegisterOfflineWorker} className="mt-4 space-y-4">
@@ -1879,7 +2207,7 @@ export default function NakaSetuApp() {
                     <div>
                       <label
                         htmlFor="enroll-name"
-                        className="block text-xs font-semibold text-[#0F172A] mb-1"
+                        className="block text-xs font-semibold text-slate-700 mb-1"
                       >
                         Worker Name
                       </label>
@@ -1889,14 +2217,14 @@ export default function NakaSetuApp() {
                         value={enrollName}
                         onChange={(e) => setEnrollName(e.target.value)}
                         placeholder="e.g. Govind Kale"
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8]"
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8]"
                       />
                     </div>
 
                     <div>
                       <label
                         htmlFor="enroll-phone"
-                        className="block text-xs font-semibold text-[#0F172A] mb-1"
+                        className="block text-xs font-semibold text-slate-700 mb-1"
                       >
                         10-Digit Mobile Number
                       </label>
@@ -1907,14 +2235,14 @@ export default function NakaSetuApp() {
                         value={enrollPhone}
                         onChange={(e) => setEnrollPhone(e.target.value)}
                         placeholder="e.g. 9820155412"
-                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8]"
+                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8]"
                       />
                     </div>
 
                     <div>
                       <label
                         htmlFor="enroll-skill"
-                        className="block text-xs font-semibold text-[#0F172A] mb-1"
+                        className="block text-xs font-semibold text-slate-700 mb-1"
                       >
                         Skill Dropdown (All 10 Services)
                       </label>
@@ -1922,7 +2250,7 @@ export default function NakaSetuApp() {
                         id="enroll-skill"
                         value={enrollSkillId}
                         onChange={(e) => setEnrollSkillId(e.target.value)}
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#1D4ED8]"
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-[#1D4ED8]"
                       >
                         {SERVICE_CATALOG.map((service) => (
                           <option key={service.id} value={service.id}>
@@ -1935,7 +2263,7 @@ export default function NakaSetuApp() {
                     <div>
                       <label
                         htmlFor="enroll-hub"
-                        className="block text-xs font-semibold text-[#0F172A] mb-1"
+                        className="block text-xs font-semibold text-slate-700 mb-1"
                       >
                         Base Naka / Hub
                       </label>
@@ -1943,7 +2271,7 @@ export default function NakaSetuApp() {
                         id="enroll-hub"
                         value={enrollHub}
                         onChange={(e) => setEnrollHub(e.target.value)}
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#1D4ED8]"
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-[#1D4ED8]"
                       >
                         {NAKA_HUB_OPTIONS.map((hub) => (
                           <option key={hub} value={hub}>
@@ -1956,7 +2284,7 @@ export default function NakaSetuApp() {
                     <div>
                       <label
                         htmlFor="enroll-group-size"
-                        className="block text-xs font-semibold text-[#0F172A] mb-1"
+                        className="block text-xs font-semibold text-slate-700 mb-1"
                       >
                         Group / Toli Capacity
                       </label>
@@ -1971,7 +2299,7 @@ export default function NakaSetuApp() {
                               | 'Group of 3-4 Helpers'
                           )
                         }
-                        className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#1D4ED8]"
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-[#1D4ED8]"
                       >
                         <option value="Solo">Solo</option>
                         <option value="Group of 2">Group of 2</option>
@@ -1980,20 +2308,20 @@ export default function NakaSetuApp() {
                     </div>
                   </div>
 
-                  <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#BFDBFE]">
-                    <label className="inline-flex items-center gap-2 text-xs font-medium text-[#0F172A] cursor-pointer select-none">
+                  <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-200">
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={enrollPhysicalVerified}
                         onChange={(e) => setEnrollPhysicalVerified(e.target.checked)}
-                        className="w-4 h-4 rounded border-[#93C5FD] text-[#1D4ED8] focus:ring-[#1D4ED8]"
+                        className="w-4 h-4 rounded border-slate-300 text-[#1D4ED8] focus:ring-[#1D4ED8]"
                       />
                       <span>Physical ID inspected at Naka drive</span>
                     </label>
 
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shadow-sm"
+                      className="px-4 py-2 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shadow-xs"
                     >
                       <span>+ Register Offline Worker</span>
                     </button>
@@ -2002,57 +2330,83 @@ export default function NakaSetuApp() {
               </div>
 
               {/* =============================================================
-                  2. LIVE WORKER DIRECTORY TABLE (APP + FEATURE-PHONE WORKERS)
+                  2. LIVE WORKER DIRECTORY TABLE + NAKA HUB FILTER BUTTONS
               ============================================================= */}
-              <div className="bg-white border border-[#93C5FD] shadow-sm shadow-blue-200/50 rounded-2xl overflow-hidden">
-                <div className="p-4 border-b border-[#BFDBFE] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-sm font-semibold text-[#0F172A]">
-                      Live Worker Directory ({filteredWorkers.length})
-                    </h2>
-                    <p className="text-xs text-[#475569] mt-0.5">
-                      Unified roster showing online Smartphone App partners and offline Feature-Phone / Naka workers
-                    </p>
+              <div className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden">
+                <div className="p-4 border-b border-slate-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-900">
+                        {t.directoryTitle} ({filteredWorkers.length})
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Unified roster showing online Smartphone App partners and offline Feature-Phone / Naka workers
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Search worker, trade, naka..."
+                          value={opsSearchQuery}
+                          onChange={(e) => setOpsSearchQuery(e.target.value)}
+                          className="pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8]"
+                        />
+                      </div>
+                      <div className="inline-flex items-center p-1 bg-slate-100 border border-slate-200 rounded-xl">
+                        {(['All', 'App', 'Feature Phone'] as const).map((pt) => (
+                          <button
+                            key={pt}
+                            type="button"
+                            onClick={() => setOpsPhoneFilter(pt)}
+                            className={`px-2.5 py-1 text-xs rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                              opsPhoneFilter === pt
+                                ? 'bg-[#1D4ED8] text-white shadow-2xs font-semibold'
+                                : 'text-slate-600 hover:text-slate-900 font-medium'
+                            }`}
+                          >
+                            {pt === 'App'
+                              ? 'App User'
+                              : pt === 'Feature Phone'
+                                ? 'Feature Phone'
+                                : 'All'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-[#475569] absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="Search worker, trade, naka..."
-                        value={opsSearchQuery}
-                        onChange={(e) => setOpsSearchQuery(e.target.value)}
-                        className="pl-8 pr-3 py-1.5 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8]"
-                      />
-                    </div>
-                    <div className="inline-flex items-center p-1 bg-[#DBEAFE] border border-[#93C5FD] rounded-xl">
-                      {(['All', 'App', 'Feature Phone'] as const).map((pt) => (
+                  {/* Naka Hub Filter Buttons Row */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pt-1">
+                    <span className="text-[11px] font-semibold text-slate-500 mr-1 shrink-0">
+                      Filter by Naka Hub:
+                    </span>
+                    {(['All Hubs', ...NAKA_HUB_OPTIONS] as const).map((hub) => {
+                      const active = opsHubFilter === hub;
+                      return (
                         <button
-                          key={pt}
+                          key={hub}
                           type="button"
-                          onClick={() => setOpsPhoneFilter(pt)}
-                          className={`px-2.5 py-1 text-xs rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                            opsPhoneFilter === pt
-                              ? 'bg-[#1D4ED8] text-white shadow-xs font-semibold'
-                              : 'text-[#1E3A8A] hover:text-[#0F172A] font-medium'
+                          onClick={() => setOpsHubFilter(hub)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer border ${
+                            active
+                              ? 'bg-orange-600 text-white border-orange-600 font-semibold'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
-                          {pt === 'App'
-                            ? 'App User'
-                            : pt === 'Feature Phone'
-                              ? 'Feature Phone'
-                              : 'All'}
+                          {hub}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-[#93C5FD] bg-[#DBEAFE]/70 text-[11px] font-semibold text-[#1E3A8A]">
+                      <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
                         <th className="py-3 px-4">Worker Details</th>
                         <th className="py-3 px-4">Primary Skill</th>
                         <th className="py-3 px-4">Device Type</th>
@@ -2062,25 +2416,25 @@ export default function NakaSetuApp() {
                         <th className="py-3 px-4 text-right">Dispatch Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#BFDBFE] text-xs tabular-nums">
+                    <tbody className="divide-y divide-slate-200 text-xs tabular-nums">
                       {filteredWorkers.map((worker) => (
-                        <tr key={worker.id} className="hover:bg-[#DBEAFE]/35 transition-colors">
+                        <tr key={worker.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3.5 px-4">
-                            <div className="font-semibold text-[#0F172A]">{worker.name}</div>
-                            <div className="text-[11px] font-mono text-[#475569] mt-0.5">
+                            <div className="font-semibold text-slate-900">{worker.name}</div>
+                            <div className="text-[11px] font-mono text-slate-500 mt-0.5">
                               {worker.id} · {worker.phone} · {worker.hubLocation}
                             </div>
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <div className="font-medium text-[#0F172A]">{worker.skill}</div>
+                            <div className="font-medium text-slate-900">{worker.skill}</div>
                             <div className="text-[11px] font-mono text-orange-700 font-semibold">
                               ★ {worker.rating.toFixed(1)} ({worker.completedJobs} jobs)
                             </div>
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[#0F172A] whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-700 whitespace-nowrap">
                               {worker.phoneType === 'App' ? (
                                 <>
                                   <Smartphone className="w-3.5 h-3.5 text-[#1D4ED8]" />
@@ -2095,17 +2449,17 @@ export default function NakaSetuApp() {
                             </span>
                           </td>
 
-                          <td className="py-3.5 px-4 font-medium text-[#0F172A] whitespace-nowrap">
+                          <td className="py-3.5 px-4 font-medium text-slate-800 whitespace-nowrap">
                             {worker.groupSizeDisplay}
                           </td>
 
-                          {/* Verification Badges (Semantic Green Preserved) */}
+                          {/* Verification Badges */}
                           <td className="py-3.5 px-4">
                             <div className="flex flex-wrap gap-1.5">
                               {worker.verificationBadges.map((badge) => (
                                 <span
                                   key={badge}
-                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full whitespace-nowrap"
                                 >
                                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
                                   {badge}
@@ -2114,13 +2468,13 @@ export default function NakaSetuApp() {
                             </div>
                           </td>
 
-                          {/* Semantic Status Colours Preserved */}
+                          {/* Status Badge */}
                           <td className="py-3.5 px-4">
                             <span
                               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                 worker.status === 'Available'
-                                  ? 'text-emerald-800 bg-emerald-100 border border-emerald-300'
-                                  : 'text-amber-800 bg-amber-100 border border-amber-300'
+                                  ? 'text-emerald-800 bg-emerald-50 border border-emerald-200'
+                                  : 'text-amber-800 bg-amber-50 border border-amber-200'
                               }`}
                             >
                               {worker.status}
@@ -2132,7 +2486,7 @@ export default function NakaSetuApp() {
                               <button
                                 type="button"
                                 onClick={() => setIvrTargetWorker(worker)}
-                                className="px-3 py-1.5 bg-[#DBEAFE] hover:bg-[#BFDBFE] border border-[#93C5FD] text-[#1E3A8A] shadow-2xs text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                                className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 shadow-2xs text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                               >
                                 <PhoneCall className="w-3.5 h-3.5 text-orange-600" />
                                 <span>Simulate Outbound Voice Call (IVR)</span>
@@ -2162,19 +2516,19 @@ export default function NakaSetuApp() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="partner-modal-title"
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-[#93C5FD] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-xl">
-            <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-[#BFDBFE]">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-100 border border-orange-300 text-orange-700 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0">
                   <HardHat className="w-4 h-4 text-orange-600" />
                 </div>
                 <div>
-                  <h3 id="partner-modal-title" className="text-sm font-semibold text-[#0F172A]">
+                  <h3 id="partner-modal-title" className="text-sm font-semibold text-slate-900">
                     Smartphone Partner Self-Registration
                   </h3>
-                  <p className="text-xs text-[#475569] mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Instant Digital KYC onboarding into NakaSetu Live Dispatch Directory
                   </p>
                 </div>
@@ -2182,7 +2536,7 @@ export default function NakaSetuApp() {
               <button
                 type="button"
                 onClick={() => setIsPartnerModalOpen(false)}
-                className="p-1 text-[#475569] hover:text-[#0F172A] rounded-lg cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
                 aria-label="Close partner registration modal"
               >
                 <X className="w-4 h-4" />
@@ -2194,7 +2548,7 @@ export default function NakaSetuApp() {
                 <div>
                   <label
                     htmlFor="partner-name"
-                    className="block text-xs font-semibold text-[#0F172A] mb-1"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
                   >
                     Full Name
                   </label>
@@ -2204,14 +2558,14 @@ export default function NakaSetuApp() {
                     value={partnerName}
                     onChange={(e) => setPartnerName(e.target.value)}
                     placeholder="e.g. Vikramaditya More"
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8]"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8]"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="partner-phone"
-                    className="block text-xs font-semibold text-[#0F172A] mb-1"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
                   >
                     10-Digit Phone
                   </label>
@@ -2222,7 +2576,7 @@ export default function NakaSetuApp() {
                     value={partnerPhone}
                     onChange={(e) => setPartnerPhone(e.target.value)}
                     placeholder="e.g. 9820933104"
-                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8]"
+                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1D4ED8]"
                   />
                 </div>
               </div>
@@ -2231,7 +2585,7 @@ export default function NakaSetuApp() {
                 <div>
                   <label
                     htmlFor="partner-trade"
-                    className="block text-xs font-semibold text-[#0F172A] mb-1"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
                   >
                     Primary Trade
                   </label>
@@ -2239,7 +2593,7 @@ export default function NakaSetuApp() {
                     id="partner-trade"
                     value={partnerTradeId}
                     onChange={(e) => setPartnerTradeId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#1D4ED8]"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-[#1D4ED8]"
                   >
                     {SERVICE_CATALOG.map((service) => (
                       <option key={service.id} value={service.id}>
@@ -2252,7 +2606,7 @@ export default function NakaSetuApp() {
                 <div>
                   <label
                     htmlFor="partner-locality"
-                    className="block text-xs font-semibold text-[#0F172A] mb-1"
+                    className="block text-xs font-semibold text-slate-700 mb-1"
                   >
                     Base Locality
                   </label>
@@ -2260,7 +2614,7 @@ export default function NakaSetuApp() {
                     id="partner-locality"
                     value={partnerLocality}
                     onChange={(e) => setPartnerLocality(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#93C5FD] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#1D4ED8]"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-[#1D4ED8]"
                   >
                     {NAKA_HUB_OPTIONS.map((hub) => (
                       <option key={hub} value={hub}>
@@ -2273,7 +2627,7 @@ export default function NakaSetuApp() {
 
               {/* Work Mode */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-[#0F172A]">
+                <label className="block text-xs font-semibold text-slate-700">
                   Work Mode
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -2289,8 +2643,8 @@ export default function NakaSetuApp() {
                       onClick={() => setPartnerWorkMode(mode)}
                       className={`p-3 rounded-xl text-left text-xs font-semibold transition-all cursor-pointer ${
                         partnerWorkMode === mode
-                          ? 'bg-[#BFDBFE]/65 border-2 border-[#1D4ED8] text-[#0F172A] shadow-xs'
-                          : 'bg-[#DBEAFE]/50 border border-[#93C5FD] text-[#0F172A] hover:bg-white'
+                          ? 'bg-blue-50/70 border-2 border-[#1D4ED8] text-slate-900'
+                          : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-white'
                       }`}
                     >
                       {mode}
@@ -2301,27 +2655,27 @@ export default function NakaSetuApp() {
 
               {/* ID & Certification Mock File Uploader */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-[#0F172A]">
+                <label className="block text-xs font-semibold text-slate-700">
                   ID &amp; Certification Upload
                 </label>
-                <div className="p-3.5 rounded-xl bg-[#DBEAFE]/50 border border-dashed border-[#1D4ED8] flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-dashed border-slate-300 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 text-xs">
                     {partnerKycUploaded ? (
                       <>
                         <FileCheck2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <div>
-                          <div className="font-mono font-semibold text-[#0F172A]">
+                          <div className="font-mono font-semibold text-slate-900">
                             aadhaar_trade_cert_verified.pdf
                           </div>
-                          <div className="text-[11px] text-[#475569]">
+                          <div className="text-[11px] text-slate-500">
                             Digital KYC checksum verified
                           </div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Upload className="w-4 h-4 text-[#475569] shrink-0" />
-                        <span className="text-[#475569]">
+                        <Upload className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="text-slate-500">
                           Upload Aadhaar / ITI Trade Certificate
                         </span>
                       </>
@@ -2330,24 +2684,24 @@ export default function NakaSetuApp() {
                   <button
                     type="button"
                     onClick={() => setPartnerKycUploaded((prev) => !prev)}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#DBEAFE] border border-[#93C5FD] text-xs font-semibold text-[#1E3A8A] cursor-pointer shrink-0 shadow-2xs"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs font-semibold text-slate-800 cursor-pointer shrink-0"
                   >
                     {partnerKycUploaded ? 'Replace File' : 'Upload File'}
                   </button>
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#BFDBFE]">
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsPartnerModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#475569] hover:text-[#0F172A] cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-sm"
+                  className="px-5 py-2.5 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs"
                 >
                   Complete Digital KYC &amp; Join Roster
                 </button>
@@ -2365,19 +2719,19 @@ export default function NakaSetuApp() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="ivr-modal-title"
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-[#93C5FD] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-xl">
-            <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-[#BFDBFE]">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-slate-200">
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-100 border border-orange-300 text-orange-700 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 mt-0.5">
                   <Volume2 className="w-4 h-4 text-orange-600" />
                 </div>
                 <div>
-                  <h3 id="ivr-modal-title" className="text-sm font-semibold text-[#0F172A]">
+                  <h3 id="ivr-modal-title" className="text-sm font-semibold text-slate-900">
                     Automated Voice Dispatch System (Simulated Call to +91 98201 XXXXX)
                   </h3>
-                  <p className="text-xs text-[#475569] font-mono mt-0.5">
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
                     Dialing: {ivrTargetWorker.name} ({ivrTargetWorker.phone}) · {ivrTargetWorker.hubLocation}
                   </p>
                 </div>
@@ -2385,25 +2739,25 @@ export default function NakaSetuApp() {
               <button
                 type="button"
                 onClick={() => setIvrTargetWorker(null)}
-                className="p-1 text-[#475569] hover:text-[#0F172A] rounded-lg cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
                 aria-label="Close IVR modal"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 bg-[#DBEAFE]/60 border border-[#93C5FD] rounded-xl space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-[#1E3A8A]">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
                 <span>BILINGUAL CALL AUDIO SCRIPT (2G VOICE)</span>
                 <span className="text-orange-700 font-semibold">LIVE AUDIO STREAM</span>
               </div>
-              <blockquote className="text-sm font-medium text-[#0F172A] leading-relaxed">
+              <blockquote className="text-sm font-medium text-slate-900 leading-relaxed">
                 &ldquo;Namaste Suresh ji. 1.2 km door luggage shifting ke liye 2 workers ki zaroorat hai. Budget ₹360. Kaam accept karne ke liye 1 dabayein, mana karne ke liye 2 dabayein.&rdquo;
               </blockquote>
             </div>
 
             <div className="space-y-2.5">
-              <div className="text-xs font-semibold text-[#0F172A] flex items-center gap-1.5">
+              <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                 <Hash className="w-3.5 h-3.5 text-orange-600" />
                 <span>Interactive Feature-Phone Keypad Response:</span>
               </div>
@@ -2411,14 +2765,14 @@ export default function NakaSetuApp() {
                 <button
                   type="button"
                   onClick={() => handleIvrKeyPress('1')}
-                  className="py-2.5 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="py-2.5 px-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
                   <span>Press 1 to Accept</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleIvrKeyPress('2')}
-                  className="py-2.5 px-4 bg-white hover:bg-[#DBEAFE]/50 text-[#0F172A] border border-[#93C5FD] text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>Press 2 to Decline</span>
                 </button>
@@ -2436,33 +2790,33 @@ export default function NakaSetuApp() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="masked-call-title"
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-[#93C5FD] rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#BFDBFE]">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <PhoneCall className="w-4 h-4 text-[#1D4ED8]" />
-                <h3 id="masked-call-title" className="text-sm font-semibold text-[#0F172A]">
+                <h3 id="masked-call-title" className="text-sm font-semibold text-slate-900">
                   Masked Number Proxy Line
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsMaskedCallModalOpen(false)}
-                className="p-1 text-[#475569] hover:text-[#0F172A] rounded-lg cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 bg-[#DBEAFE]/60 border border-[#93C5FD] rounded-xl text-center space-y-2">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-2">
               <div className="text-xs font-mono font-semibold text-[#1D4ED8]">
                 Connecting securely via proxy line...
               </div>
-              <div className="text-sm font-bold text-[#0F172A]">
+              <div className="text-sm font-bold text-slate-900">
                 Ramesh Pawar (+91 22-4890-7712)
               </div>
-              <p className="text-xs text-[#475569]">
+              <p className="text-xs text-slate-500">
                 Both customer and worker phone numbers remain anonymized.
               </p>
             </div>
@@ -2471,7 +2825,7 @@ export default function NakaSetuApp() {
               <button
                 type="button"
                 onClick={() => setIsMaskedCallModalOpen(false)}
-                className="px-4 py-2 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs"
+                className="px-4 py-2 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 End Proxy Call
               </button>
@@ -2481,17 +2835,17 @@ export default function NakaSetuApp() {
       )}
 
       {/* =====================================================================
-          MODAL D: EMERGENCY SOS MODAL (SEMANTIC RED PRESERVED)
+          MODAL D: EMERGENCY SOS MODAL
       ===================================================================== */}
       {isSosModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="sos-modal-title"
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
           <div className="bg-white border border-red-200 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#BFDBFE]">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2 text-red-700">
                 <AlertTriangle className="w-4 h-4" />
                 <h3 id="sos-modal-title" className="text-sm font-semibold">
@@ -2501,7 +2855,7 @@ export default function NakaSetuApp() {
               <button
                 type="button"
                 onClick={() => setIsSosModalOpen(false)}
-                className="p-1 text-[#475569] hover:text-[#0F172A] rounded-lg cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2538,23 +2892,23 @@ export default function NakaSetuApp() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="upi-qr-modal-title"
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-[#93C5FD] rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#BFDBFE]">
-              <h3 id="upi-qr-modal-title" className="text-sm font-semibold text-[#0F172A]">
-                Direct Worker UPI QR (₹{selectedService.baseRate})
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 id="upi-qr-modal-title" className="text-sm font-semibold text-slate-900">
+                Direct Worker UPI QR (₹{estimatedTotal})
               </h3>
               <button
                 type="button"
                 onClick={() => setIsUpiQrModalOpen(false)}
-                className="p-1 text-[#475569] hover:text-[#0F172A] rounded-lg cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="w-44 h-44 mx-auto bg-white p-3 border border-[#93C5FD] rounded-2xl shadow-2xs">
+            <div className="w-44 h-44 mx-auto bg-white p-3 border border-slate-200 rounded-2xl">
               <svg
                 viewBox="0 0 64 64"
                 className="w-full h-full"
@@ -2580,10 +2934,10 @@ export default function NakaSetuApp() {
             </div>
 
             <div className="text-xs space-y-1">
-              <div className="font-mono font-bold text-[#1E3A8A]">
+              <div className="font-mono font-bold text-[#1D4ED8]">
                 rameshpawar.naka@upi
               </div>
-              <p className="text-[#475569]">
+              <p className="text-slate-500">
                 100% direct transfer to worker · Zero platform cut
               </p>
             </div>
@@ -2591,10 +2945,146 @@ export default function NakaSetuApp() {
             <button
               type="button"
               onClick={() => setIsUpiQrModalOpen(false)}
-              className="w-full py-2.5 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs"
+              className="w-full py-2.5 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
             >
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          MODAL F: PAST BOOKINGS HISTORY & DIGITAL RECEIPT VIEW
+      ===================================================================== */}
+      {isBookingsModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bookings-modal-title"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 text-[#1D4ED8] flex items-center justify-center">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 id="bookings-modal-title" className="text-sm font-semibold text-slate-900">
+                    Past Bookings &amp; Digital Receipts ({bookingHistory.length})
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Click any booking to inspect its verified OTP log and zero-commission receipt
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBookingsModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+              {/* Bookings List */}
+              <div className="md:col-span-5 space-y-2">
+                {bookingHistory.map((b) => {
+                  const isSelected = selectedReceipt?.id === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setSelectedReceipt(b)}
+                      className={`w-full text-left p-3 rounded-xl border text-xs transition-all cursor-pointer space-y-1 ${
+                        isSelected
+                          ? 'bg-blue-50/70 border-2 border-[#1D4ED8]'
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-mono">
+                        <span className="font-bold text-slate-900">{b.invoiceNo}</span>
+                        <span className="font-bold text-orange-700">₹{b.totalAmount}</span>
+                      </div>
+                      <div className="font-semibold text-slate-800">{b.serviceLabel}</div>
+                      <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                        <span>{b.workerName}</span>
+                        <span>{b.completedAt}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Digital Receipt Inspector */}
+              <div className="md:col-span-7">
+                {selectedReceipt ? (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs tabular-nums">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-200">
+                      <div>
+                        <span className="text-[10px] font-mono uppercase font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          PAID · 0% COMMISSION
+                        </span>
+                        <h4 className="text-sm font-bold text-slate-900 mt-1">
+                          Receipt #{selectedReceipt.invoiceNo} ({selectedReceipt.id})
+                        </h4>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-orange-800 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full">
+                        {selectedReceipt.rating}.0 ★
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-slate-600">
+                      <div className="flex justify-between">
+                        <span>Service Tier</span>
+                        <strong className="text-slate-900">{selectedReceipt.serviceLabel}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Assigned Professional</span>
+                        <strong className="text-slate-900">{selectedReceipt.workerName}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Scope Calculation</span>
+                        <span className="font-mono text-slate-900">
+                          {selectedReceipt.helperCount}x Worker × {selectedReceipt.durationUnits}{' '}
+                          {selectedReceipt.unitLabel} (@ ₹{selectedReceipt.baseRate})
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Payment Mode</span>
+                        <span className="font-mono text-slate-900">
+                          {selectedReceipt.paymentMethod}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Verified Handshake OTPs</span>
+                        <span className="font-mono text-slate-900">
+                          Start #{selectedReceipt.startOtp} · Stop #{selectedReceipt.stopOtp}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Landmark</span>
+                        <span className="text-slate-800 text-right max-w-[200px] truncate">
+                          {selectedReceipt.landmark}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-slate-200 flex items-center justify-between text-sm font-bold text-slate-900">
+                      <span>Total Settled Direct to Worker</span>
+                      <span className="font-mono text-[#1D4ED8]">
+                        ₹{selectedReceipt.totalAmount}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    Select a booking on the left to inspect its digital receipt.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
