@@ -8,7 +8,7 @@
 <br />
 
 [![Live Demo](https://img.shields.io/badge/⚡_Live_Demo-Vercel_Edge-0284C7?style=for-the-badge&logo=vercel&logoColor=white)](https://code-vibers-dhruv-surti-naka-setu-ten.vercel.app/)
-[![Demo Video](https://img.shields.io/badge/🎥_Demo_Video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/ph4oA3fFhso)
+[![Demo Video](https://img.shields.io/badge/🎥_Demo_Video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/eFp7sUV7hm0)
 [![React 19](https://img.shields.io/badge/React_19-0F172A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript_5-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS_v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
@@ -16,7 +16,7 @@
 
 <br />
 
-[Explore Live Demo](https://code-vibers-dhruv-surti-naka-setu-ten.vercel.app/) • [Watch Demo Video (YouTube)](https://youtu.be/ph4oA3fFhso) • [Problem Statement](#-the-problem--real-world-context) • [System Architecture](#-system-architecture--technical-deep-dive) • [Dual Workspaces](#-dual-workspace-experience) • [Inclusion Protocol](#-voice-over-2g-inclusion-protocol) • [Quickstart](#-developer-quickstart)
+[Explore Live Demo](https://code-vibers-dhruv-surti-naka-setu-ten.vercel.app/) • [Watch Demo Video (YouTube)](https://youtu.be/eFp7sUV7hm0) • [Problem Statement](#-the-problem--real-world-context) • [System Architecture](#-system-architecture--technical-deep-dive) • [Dual Workspaces](#-dual-workspace-experience) • [Inclusion Protocol](#-voice-over-2g-inclusion-protocol) • [Quickstart](#-developer-quickstart)
 
 <br />
 
